@@ -1,10 +1,10 @@
 # Strange Rhino
 
-![Strange Rhino logo; adapted from an icon by Freepik (https://www.flaticon.com/). Creative Commons BY 3.0](readme/images/rhino.png)
+![](readme/images/rhino.png)
 
-Strange Rhino is the fork of [Mozilla Rhino](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/Rhino) that has been customized for its role as the script engine for [Strange Eons](https://cgjennings.github.io/se3docs/index.html).
+Strange Rhino is a fork of [Mozilla Rhino](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/Rhino) that has been customized for its role as the script engine for [Strange Eons](https://cgjennings.github.io/se3docs/index.html).
 
-## Differences
+## What's different?
 
 ### Language
 
@@ -38,4 +38,4 @@ The contents of the `mozilla/util` package have been added in order to bridge be
 
 ## License information
 
-Strange Rhino and Mozilla Rhino are licensed under MPL 2.0. The original Rhino license and notices can be found under `src/license-metadata`.
+Strange Rhino and Mozilla Rhino are licensed under MPL 2.0. The original Rhino license and notices can be found under `src/license-metadata`. Rhino image adapted from an icon by [Freepik](https://www.flaticon.com/) under Creative Commons BY 3.0.
