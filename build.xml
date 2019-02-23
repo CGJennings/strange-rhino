@@ -11,9 +11,13 @@
     <description>Builds, tests, and runs the project strange-rhino.</description>
     <import file="nbproject/build-impl.xml"/>
     
-    <!-- copy library to SE project -->
+    <!-- copy library to SE project if it is colocated with this project -->
     <target name="-post-jar"> 
-        <copy file="${dist.dir}/strange-rhino.jar" tofile="${basedir}/../strange-eons/lib/strange-rhino.jar"/>
+        <copy
+            file="${dist.dir}/strange-rhino.jar"
+            todir="${basedir}/../strange-eons/lib"
+            failonerror="false"
+        />
     </target>    
     
     <!--
