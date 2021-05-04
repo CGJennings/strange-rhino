@@ -22,7 +22,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package ca.cgjennings.script.util;
+package ca.cgjennings.script.mozilla.util;
 
 import javax.script.*;
 import java.util.LinkedList;

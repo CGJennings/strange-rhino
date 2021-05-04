@@ -22,7 +22,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package ca.cgjennings.script.util;
+package ca.cgjennings.script.mozilla.util;
 
 import javax.script.ScriptException;
 
@@ -30,7 +30,7 @@ import javax.script.ScriptException;
  * An extension of javax.script.ScriptException that allows
  * the cause of an exception to be set.
  *
- * Modified by C. Jennings tp use initCause instead of its own
+ * Modified by C. Jennings to use initCause instead of its own
  * cause member.
  */
 public class ExtendedScriptException extends ScriptException {
