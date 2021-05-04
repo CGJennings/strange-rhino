@@ -21,66 +21,79 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-package ca.cgjennings.script.mozilla.util;
+ 
+package ca.cgjennings.script.util;
 
 import java.util.*;
-import javax.script.Bindings;
 
-/*
- * Abstract super class for Bindings implementations. Handles
- * global and local scopes.
+/**
+ * Entry set implementation for Bindings implementations
  *
- * @author Mike Grogan
  * @version 1.0
+ * @author Mike Grogan
  * @since 1.6
  */
-public abstract class BindingsImpl extends BindingsBase {
+public class BindingsEntrySet extends AbstractSet<Map.Entry<String, Object>> {
     
-    //get method delegates to global if key is not defined in
-    //base class or local scope
-    protected Bindings global = null;
+    private BindingsBase base;
+    private String[] keys;
     
-    //get delegates to local scope
-    protected Bindings local = null;
-    
-    public void setGlobal(Bindings n) {
-        global = n;
+    public BindingsEntrySet(BindingsBase base) {
+        this.base = base;
+        keys = base.getNames();
     }
     
-    public void setLocal(Bindings n) {
-        local = n;
+    public int size() {
+        return keys.length;
     }
     
-    public  Set<Map.Entry<String, Object>> entrySet() {
-        return new BindingsEntrySet(this);
+    public Iterator<Map.Entry<String, Object>> iterator() {
+        return new BindingsIterator();
     }
     
-    public Object get(Object key) {
-        checkKey(key);
-        
-        Object ret  = null;
-        if ((local != null) && (null != (ret = local.get(key)))) {
-            return ret;
+    public class BindingsEntry implements Map.Entry<String, Object> {
+        private String key;
+        public BindingsEntry(String key) {
+            this.key = key;
         }
         
-        ret = getImpl((String)key);
-        
-        if (ret != null) {
-            return ret;
-        } else if (global != null) {
-            return global.get(key);
-        } else {
-            return null;
+        public Object setValue(Object value) {
+            throw new UnsupportedOperationException();
         }
+        
+        public String getKey() {
+            return key;
+        }
+        
+        public Object getValue() {
+            return base.get(key);
+        }
+        
     }
     
-    public Object remove(Object key) {
-        checkKey(key);
-        Object ret = get(key);
-        if (ret != null) {
-            removeImpl((String)key);
+    public class BindingsIterator implements Iterator<Map.Entry<String, Object>> {
+        
+        private int current = 0;
+        private boolean stale = false;
+        
+        public boolean hasNext() {
+            return (current < keys.length);
         }
-        return ret;
+       
+        public BindingsEntry next() {
+            stale = false;
+            return new BindingsEntry(keys[current++]);
+        }
+        
+        public void remove() {
+            if (stale || current == 0) {
+                throw new IllegalStateException();
+            }
+            
+            stale = true;
+            base.remove(keys[current - 1]);
+        }
+        
     }
+    
 }

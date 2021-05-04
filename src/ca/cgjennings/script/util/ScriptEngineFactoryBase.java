@@ -22,61 +22,36 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package ca.cgjennings.script.mozilla.util;
+package ca.cgjennings.script.util;
 
-import javax.script.Bindings;
-import java.util.Map;
-import java.util.AbstractMap;
+import javax.script.*;
 
-/**
- * Abstract super class for Bindings implementations
+/*
+ * Abstract super class for factory implementations.
  *
  * @version 1.0
  * @author Mike Grogan
  * @since 1.6
  */
-public abstract class BindingsBase extends AbstractMap<String, Object>
-        implements Bindings {
+public abstract class ScriptEngineFactoryBase implements ScriptEngineFactory {
     
-    //AbstractMap methods
-    public Object get(Object name) {
-        checkKey(name);
-        return getImpl((String)name);
+    public String getName() {
+        return (String)getParameter(ScriptEngine.NAME);
     }
     
-    public Object remove(Object key) {
-        checkKey(key);
-        return removeImpl((String)key);
+    public String getEngineName() {
+        return (String)getParameter(ScriptEngine.ENGINE);
     }
     
-    public Object put(String key, Object value) {
-        checkKey(key);
-        return putImpl(key, value);
+    public String getEngineVersion() {
+        return (String)getParameter(ScriptEngine.ENGINE_VERSION);
     }
     
-    public void putAll(Map<? extends String, ? extends Object> toMerge) {
-        for (Map.Entry<? extends String, ? extends Object> entry : toMerge.entrySet()) {
-            String key = entry.getKey();
-            checkKey(key);
-            putImpl(entry.getKey(), entry.getValue());
-        }
+    public String getLanguageName() {
+        return (String)getParameter(ScriptEngine.LANGUAGE);
     }
     
-    //BindingsBase methods
-    public abstract Object putImpl(String name, Object value);
-    public abstract Object getImpl(String name);
-    public abstract Object removeImpl(String name);
-    public abstract String[] getNames();
-    
-    protected void checkKey(Object key) {
-        if (key == null) {
-            throw new NullPointerException("key can not be null");
-        }
-        if (!(key instanceof String)) {
-            throw new ClassCastException("key should be String");
-        }
-        if (key.equals("")) {
-            throw new IllegalArgumentException("key can not be empty");
-        }
+    public String getLanguageVersion() {
+        return (String)getParameter(ScriptEngine.LANGUAGE_VERSION);
     }
 }

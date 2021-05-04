@@ -22,7 +22,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-package ca.cgjennings.script.mozilla.util;
+package ca.cgjennings.script.util;
 
 import javax.script.ScriptException;
 
