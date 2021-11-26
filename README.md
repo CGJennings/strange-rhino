@@ -28,13 +28,19 @@ Similarly, identifiers starting with `#` are used to look up strings in the data
 
 ### Implementation notes
 
-To prevent the possibility of confusing Mozilla Rhino and Strange Rhino, Strange Rhino has been moved to the package `ca.cgjennings.script.mozilla` (instead of `org.mozilla`).
-
-> To incorporate updates, you must not only update the folder structure and `org.mozilla` references in the code, but you must also update the many string literal class references used for code generation (`"Lorg/mozilla/..."`).
+#### Debugger changes
 
 In order to interoperate with the Strange Eons [script debugger](https://cgjennings.github.io/se3docs/dm-debugger.html), the adapter classes in `javascript/tools/debugger` have been modified and/or replaced. The following classes are kept (with modifications): `Dim`, `GuiCallback`, `ScopeProvider`, `SourceProvider`. The Rhino debugger is not used, and its sources and dependencies have been removed: `Main`, `SwingGui`, `test.j` and the entire contents of the `treetable` package.
 
-The contents of the `mozilla/util` package have been added in order to bridge between (Strange) Rhino and Strange Eons via the JSR 223 scripting interface. These are adapted from the reference implementation for adding Rhino to JSR 223.
+#### JSR 223
+
+The contents of the `ca.cgjennings.script.util` package bridge between Strange Rhino and Strange Eons via the JSR 223 scripting interface. These classes were adapted from the reference implementation that was used to add a variant of Rhino to Java 6 for JSR 223.
+
+#### Package names
+
+Up to the commit tagged `v1.7.9r`, Strange Rhino used a different package hierarchy to prevent confusion with other variants of Rhino. The package root was `ca.cgjennings.script.mozilla` instead of `org.mozilla`.
+
+This practice stopped with the commit tagged `v1.7.9u` to make it easier to merge in upstream changes. Updating existing code should require little more than replacing the string `ca.cgjennings.script.mozilla` with `org.mozilla`, and likewise `ca/cgjennings/script/mozilla` with `org/mozilla`.
 
 ## License information
 
