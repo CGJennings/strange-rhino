@@ -30,7 +30,7 @@ Similarly, identifiers starting with `#` are used to look up strings in the data
 
 #### Debugger changes
 
-In order to interoperate with the Strange Eons [script debugger](https://cgjennings.github.io/se3docs/dm-debugger.html), the adapter classes in `javascript/tools/debugger` have been modified and/or replaced. The following classes are kept (with modifications): `Dim`, `GuiCallback`, `ScopeProvider`, `SourceProvider`. The Rhino debugger is not used, and its sources and dependencies have been removed: `Main`, `SwingGui`, `test.j` and the entire contents of the `treetable` package.
+In order to interoperate with the Strange Eons [script debugger](https://cgjennings.github.io/se3docs/dm-debugger.html), the adapter classes in `javascript/tools/debugger` have been modified and/or replaced. The following classes are kept (with modifications): `Dim`, `GuiCallback`, `ScopeProvider`, `SourceProvider`. The Rhino debugger is not used, and its sources and dependencies have been removed: `Main`, `SwingGui`, `test.js` and the entire contents of the `treetable` package.
 
 #### JSR 223
 
