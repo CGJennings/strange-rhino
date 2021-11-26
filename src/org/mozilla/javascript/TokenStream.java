@@ -482,9 +482,7 @@ class TokenStream
             tokenBeg = cursor - 1;
             tokenEnd = cursor;
 
-/* CGJ BEGIN: Comment out this line so that '@' can appear in regular symbol names. */
-//            if (c == '@') return Token.XMLATTR;
-/* CGJ END -------------------------- */
+            if (c == '@') return Token.XMLATTR;
 
             // identifier/keyword/instanceof?
             // watch out for starting with a <backslash>
@@ -502,9 +500,7 @@ class TokenStream
                     c = '\\';
                 }
             } else {
-/* CGJ BEGIN */
-                identifierStart = Character.isJavaIdentifierStart((char)c) || (c == '@') || (c == '#');
-/* CGJ END */
+                identifierStart = Character.isJavaIdentifierStart((char)c);
                 if (identifierStart) {
                     stringBufferTop = 0;
                     addToString(c);
@@ -545,15 +541,6 @@ class TokenStream
                                 parser.addError("msg.illegal.character", c);
                                 return Token.ERROR;
                             }
-/* CGJ BEGIN: allow '-' in @,#,$ identifiers */
-                        } else if (c == '-') {
-                            char idStart = stringBuffer[0];
-                            if (idStart == '$' || idStart == '@' || idStart == '#') {
-                                addToString(c);
-                            } else {
-                                break;
-                            }
-/* CGJ END ----------------------------------*/
                         } else {
                             if (c == EOF_CHAR || c == BYTE_ORDER_MARK
                                 || !Character.isJavaIdentifierPart((char)c))

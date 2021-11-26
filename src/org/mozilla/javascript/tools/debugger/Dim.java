@@ -125,13 +125,6 @@ public class Dim {
      */
     private boolean breakOnReturn;
 
-/* CGJ BEGIN */
-    /**
-     * Whether the debugger should break when a debugger; statement is reached
-     */
-    private boolean breakOnDebuggerStatement = true;
-/* CGJ END */
-
     /**
      * Table mapping URLs to information about the script source.
      */
@@ -210,20 +203,6 @@ public class Dim {
     public void setBreakOnReturn(boolean breakOnReturn) {
         this.breakOnReturn = breakOnReturn;
     }
-
-/* CGJ BEGIN */
-    /**
-     * Sets whether the debugger should break at the next debugger statement.
-     * @param b
-     */
-    public void setBreakOnStatement( boolean breakOnDebuggerStatement ) {
-            this.breakOnDebuggerStatement = breakOnDebuggerStatement;
-    }
-
-    public boolean getBreakOnStatement() {
-            return breakOnDebuggerStatement;
-    }
-/* CGJ END */
 
     /**
      * Attaches the debugger to the given ContextFactory.
@@ -384,18 +363,6 @@ public class Dim {
         callback.updateSourceText(sourceInfo);
     }
 
-	public String[] getTopLevelScriptURLs() {
-		synchronized( urlToSourceInfo ) {
-			Set<String> keys = urlToSourceInfo.keySet();
-			String[] urls = keys.toArray( new String[keys.size()] );
-			return urls;
-		}
-	}
-
-	public SourceInfo getSourceInfoForScript( String url ) {
-		return (SourceInfo) urlToSourceInfo.get( url );
-	}
-
     /**
      * Returns the FunctionSource object for the given function or script.
      */
@@ -438,7 +405,7 @@ public class Dim {
             // (eval)
             // Option: similar teatment for Function?
             char evalSeparator = '#';
-            StringBuffer sb = null;
+            StringBuilder sb = null;
             int urlLength = url.length();
             int cursor = 0;
             for (;;) {
@@ -466,7 +433,7 @@ public class Dim {
                     break;
                 }
                 if (sb == null) {
-                    sb = new StringBuffer();
+                    sb = new StringBuilder();
                     sb.append(url.substring(0, searchStart));
                 }
                 sb.append(replace);
@@ -561,32 +528,6 @@ public class Dim {
             monitor.notifyAll();
         }
     }
-
-	public String eval( String expr, StackFrame frame ) {
-        String result = "undefined";
-        if (expr == null || frame == null ) {
-            return result;
-        }
-
-		synchronized (monitor) {
-			if (insideInterruptLoop) {
-				evalRequest = expr;
-				evalFrame = frame;
-				monitor.notify();
-				do {
-					try {
-						monitor.wait();
-					} catch (InterruptedException exc) {
-						Thread.currentThread().interrupt();
-						break;
-					}
-				} while (evalRequest != null);
-				result = evalResult;
-			}
-		}
-
-        return result;
-	}
 
     /**
      * Evaluates the given script.
@@ -1287,10 +1228,7 @@ interruptedCheck:
          * Called when a 'debugger' statement is executed.
          */
         public void onDebuggerStatement(Context cx) {
-/* CGJ */
-			if( dim.breakOnDebuggerStatement ) {
-				dim.handleBreakpointHit(this, cx);
-			}
+            dim.handleBreakpointHit(this, cx);
         }
 
         /**
@@ -1334,7 +1272,7 @@ interruptedCheck:
         public int getLineNumber() {
             return lineNumber;
         }
-
+        
         /**
          * Returns the current function name.
          */
