@@ -3,6 +3,9 @@
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/** CGJ: file modified from original as indicated by blocks marked "CGJ" */
+
 package org.mozilla.javascript.tools.debugger;
 
 import org.mozilla.javascript.*;
@@ -204,6 +207,18 @@ public class Dim {
         this.breakOnReturn = breakOnReturn;
     }
 
+/* CGJ BEGIN: Add field to track whether to break on the debugger statement.  */
+        private boolean breakOnDebuggerStatement = true;
+
+        public void setBreakOnStatement(boolean breakOnDebuggerStatement) {
+            this.breakOnDebuggerStatement = breakOnDebuggerStatement;
+        }
+
+        public boolean getBreakOnStatement() {
+            return breakOnDebuggerStatement;
+        }
+/* CGJ END -------------------------- */
+
     /**
      * Attaches the debugger to the given ContextFactory.
      */
@@ -363,6 +378,20 @@ public class Dim {
         callback.updateSourceText(sourceInfo);
     }
 
+/* CGJ BEGIN Give debugger client access to script sources */
+	public String[] getTopLevelScriptURLs() {
+		synchronized( urlToSourceInfo ) {
+			Set<String> keys = urlToSourceInfo.keySet();
+			String[] urls = keys.toArray( new String[keys.size()] );
+			return urls;
+		}
+	}
+
+	public SourceInfo getSourceInfoForScript( String url ) {
+		return (SourceInfo) urlToSourceInfo.get( url );
+	}
+/* CGJ END */
+
     /**
      * Returns the FunctionSource object for the given function or script.
      */
@@ -405,7 +434,9 @@ public class Dim {
             // (eval)
             // Option: similar teatment for Function?
             char evalSeparator = '#';
+/* CGJ BEGIN: StringBuffer -> StringBuilder */
             StringBuilder sb = null;
+/* CGJ END -------------------------- */
             int urlLength = url.length();
             int cursor = 0;
             for (;;) {
@@ -433,7 +464,9 @@ public class Dim {
                     break;
                 }
                 if (sb == null) {
+/* CGJ BEGIN: StringBuffer -> StringBuilder */
                     sb = new StringBuilder();
+/* CGJ END -------------------------- */
                     sb.append(url.substring(0, searchStart));
                 }
                 sb.append(replace);
@@ -528,6 +561,34 @@ public class Dim {
             monitor.notifyAll();
         }
     }
+
+/* CGJ BEGIN: Add ability to evaluate at any stack frame, not just top. */
+    public String eval(String expr, StackFrame frame) {
+        String result = "undefined";
+        if (expr == null || frame == null) {
+            return result;
+        }
+
+        synchronized (monitor) {
+            if (insideInterruptLoop) {
+                evalRequest = expr;
+                evalFrame = frame;
+                monitor.notify();
+                do {
+                    try {
+                        monitor.wait();
+                    } catch (InterruptedException exc) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                } while (evalRequest != null);
+                result = evalResult;
+            }
+        }
+
+        return result;
+    }
+/* CGJ END -------------------------- */
 
     /**
      * Evaluates the given script.
@@ -1228,6 +1289,9 @@ interruptedCheck:
          * Called when a 'debugger' statement is executed.
          */
         public void onDebuggerStatement(Context cx) {
+/* CGJ BEGIN: Add field to track whether to break on the debugger statement.  */
+            if (!dim.breakOnDebuggerStatement) return;
+/* CGJ END -------------------------- */
             dim.handleBreakpointHit(this, cx);
         }
 
@@ -1272,7 +1336,7 @@ interruptedCheck:
         public int getLineNumber() {
             return lineNumber;
         }
-        
+
         /**
          * Returns the current function name.
          */
