@@ -4,8 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/** CGJ: file modified from original as indicated by blocks marked "CGJ" */
-
 package org.mozilla.javascript;
 
 import java.io.IOException;
@@ -332,7 +330,7 @@ class TokenStream
             // Non ReservedWord, but Non IdentifierName in strict mode code.
             // 12.1.1 Static Semantics: Early Errors
             Id_let           = Token.LET,   // TODO : Valid IdentifierName in non-strict mode.
-            Id_static        = Token.RESERVED; 
+            Id_static        = Token.RESERVED;
 
         int id;
         String s = name;
@@ -484,9 +482,7 @@ class TokenStream
             tokenBeg = cursor - 1;
             tokenEnd = cursor;
 
-/* CGJ BEGIN: Comment out this line so that '@' can appear in regular symbol names. */
-//            if (c == '@') return Token.XMLATTR;
-/* CGJ END -------------------------- */
+            if (c == '@') return Token.XMLATTR;
 
             // identifier/keyword/instanceof?
             // watch out for starting with a <backslash>
@@ -504,9 +500,7 @@ class TokenStream
                     c = '\\';
                 }
             } else {
-/* CGJ BEGIN: Add '@' and '#' as identifier start chars. */
-                identifierStart = Character.isJavaIdentifierStart((char)c) || (c == '@') || (c == '#');;
-/* CGJ END -------------------------- */
+                identifierStart = Character.isJavaIdentifierStart((char)c);
                 if (identifierStart) {
                     stringBufferTop = 0;
                     addToString(c);
@@ -547,15 +541,6 @@ class TokenStream
                                 parser.addError("msg.illegal.character", c);
                                 return Token.ERROR;
                             }
-/* CGJ BEGIN: Allow '-' inside @/#/$ identifiers. */
-                        } else if (c == '-') {
-                            char idStart = stringBuffer[0];
-                            if (idStart == '$' || idStart == '@' || idStart == '#') {
-                                addToString(c);
-                            } else {
-                                break;
-                            }
-/* CGJ END -------------------------- */
                         } else {
                             if (c == EOF_CHAR || c == BYTE_ORDER_MARK
                                 || !Character.isJavaIdentifierPart((char)c))
@@ -1083,6 +1068,12 @@ class TokenStream
             addToString('=');
         } else {
             if (startToken != Token.DIV) Kit.codeBug();
+            if (peekChar() == '*') {
+                tokenEnd = cursor - 1;
+                this.string = new String(stringBuffer, 0, stringBufferTop);
+                parser.reportError("msg.unterminated.re.lit");
+                return;
+            }
         }
 
         boolean inCharSet = false; // true if inside a '['..']' pair
@@ -1098,6 +1089,13 @@ class TokenStream
             if (c == '\\') {
                 addToString(c);
                 c = getChar();
+                if (c == '\n' || c == EOF_CHAR) {
+                    ungetChar(c);
+                    tokenEnd = cursor - 1;
+                    this.string = new String(stringBuffer, 0, stringBufferTop);
+                    parser.reportError("msg.unterminated.re.lit");
+                    return;
+                }
             } else if (c == '[') {
                 inCharSet = true;
             } else if (c == ']') {
@@ -1783,7 +1781,7 @@ class TokenStream
         return comment.toString();
     }
 
-    private String convertLastCharToHex(String str) {
+    private static String convertLastCharToHex(String str) {
       int lastIndex = str.length()-1;
       StringBuilder buf = new StringBuilder(
           str.substring(0, lastIndex));

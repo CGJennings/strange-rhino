@@ -12,11 +12,11 @@ public class NativeSet extends IdScriptableObject {
     private static final long serialVersionUID = -8442212766987072986L;
     private static final Object SET_TAG = "Set";
     static final String ITERATOR_TAG = "Set Iterator";
-    
+
     static final SymbolKey GETSIZE = new SymbolKey("[Symbol.getSize]");
-    
+
     private final Hashtable entries = new Hashtable();
-    
+
     private boolean instanceOfSet = false;
 
     static void init(Context cx, Scriptable scope, boolean sealed)
@@ -25,8 +25,8 @@ public class NativeSet extends IdScriptableObject {
         obj.exportAsJSClass(MAX_PROTOTYPE_ID, scope, false);
 
         ScriptableObject desc = (ScriptableObject)cx.newObject(scope);
-        desc.put("enumerable", desc, false);
-        desc.put("configurable", desc, true);
+        desc.put("enumerable", desc, Boolean.FALSE);
+        desc.put("configurable", desc, Boolean.TRUE);
         desc.put("get", desc, obj.get(GETSIZE, obj));
         obj.defineOwnProperty(cx, "size", desc);
 
@@ -88,7 +88,7 @@ public class NativeSet extends IdScriptableObject {
         Object key = k;
         if ((key instanceof Number) &&
             ((Number)key).doubleValue() == ScriptRuntime.negativeZero) {
-            key = 0.0;
+            key = ScriptRuntime.zeroObj;
         }
         entries.put(key, key);
         return this;
@@ -97,12 +97,12 @@ public class NativeSet extends IdScriptableObject {
     private Object js_delete(Object arg)
     {
         final Object ov = entries.delete(arg);
-        return (ov != null);
+        return Boolean.valueOf(ov != null);
     }
 
     private Object js_has(Object arg)
     {
-        return entries.has(arg);
+        return Boolean.valueOf(entries.has(arg));
     }
 
     private Object js_clear()
@@ -113,7 +113,7 @@ public class NativeSet extends IdScriptableObject {
 
     private Object js_getSize()
     {
-        return entries.size();
+        return Integer.valueOf(entries.size());
     }
 
     private Object js_iterator(Scriptable scope, NativeCollectionIterator.Type type)
@@ -182,7 +182,7 @@ public class NativeSet extends IdScriptableObject {
         }
     }
 
-    private NativeSet realThis(Scriptable thisObj, IdFunctionObject f)
+    private static NativeSet realThis(Scriptable thisObj, IdFunctionObject f)
     {
         if (thisObj == null) {
             throw incompatibleCallError(f);

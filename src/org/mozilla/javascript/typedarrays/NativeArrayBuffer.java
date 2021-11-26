@@ -27,8 +27,6 @@ public class NativeArrayBuffer
 
     private static final byte[] EMPTY_BUF = new byte[0];
 
-    public static final NativeArrayBuffer EMPTY_BUFFER = new NativeArrayBuffer();
-
     final byte[] buffer;
 
     @Override
@@ -57,15 +55,20 @@ public class NativeArrayBuffer
     public NativeArrayBuffer(double len)
     {
         if (len >= Integer.MAX_VALUE) {
-            throw ScriptRuntime.constructError("RangeError", "length parameter (" + len + ") is too large ");
+            throw ScriptRuntime.rangeError("length parameter (" + len + ") is too large ");
         }
         if (len == Double.NEGATIVE_INFINITY) {
-            throw ScriptRuntime.constructError("RangeError", "Negative array length " + len);
+            throw ScriptRuntime.rangeError("Negative array length " + len);
+        }
+
+        // support rounding
+        if (len <= -1) {
+            throw ScriptRuntime.rangeError("Negative array length " + len);
         }
 
         int intLen = ScriptRuntime.toInt32(len);
         if (intLen < 0) {
-            throw ScriptRuntime.constructError("RangeError", "Negative array length " + len);
+            throw ScriptRuntime.rangeError("Negative array length " + len);
         }
         if (intLen == 0) {
             buffer = EMPTY_BUF;
@@ -126,7 +129,7 @@ public class NativeArrayBuffer
         int id = f.methodId();
         switch (id) {
         case ConstructorId_isView:
-            return (isArg(args, 0) && (args[0] instanceof NativeArrayBufferView));
+            return Boolean.valueOf((isArg(args, 0) && (args[0] instanceof NativeArrayBufferView)));
 
         case Id_constructor:
             double length = isArg(args, 0) ? ScriptRuntime.toNumber(args[0]) : 0;
@@ -160,7 +163,7 @@ public class NativeArrayBuffer
         int arity;
         switch (id) {
         case Id_constructor:            arity = 1; s = "constructor"; break;
-        case Id_slice:                  arity = 1; s = "slice"; break;
+        case Id_slice:                  arity = 2; s = "slice"; break;
         default: throw new IllegalArgumentException(String.valueOf(id));
         }
         initPrototypeMethod(CLASS_NAME, id, s, arity);

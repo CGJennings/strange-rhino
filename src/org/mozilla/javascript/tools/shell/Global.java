@@ -450,7 +450,7 @@ public class Global extends ImporterTopLevel
         }
         String session = Context.toString(args[0]);
         Global global = getInstance(funObj);
-        return new Integer(global.runDoctest(cx, global, session, null, 0));
+        return global.runDoctest(cx, global, session, null, 0);
     }
 
     public int runDoctest(Context cx, Scriptable scope, String session,
@@ -465,18 +465,19 @@ public class Global extends ImporterTopLevel
             i++; // skip lines that don't look like shell sessions
         }
         while (i < lines.length) {
-            String inputString = lines[i].trim().substring(prompt0.length());
-            inputString += "\n";
+            StringBuilder inputString =
+                new StringBuilder(lines[i].trim().substring(prompt0.length()));
+            inputString.append('\n');
             i++;
             while (i < lines.length && lines[i].trim().startsWith(prompt1)) {
-                inputString += lines[i].trim().substring(prompt1.length());
-                inputString += "\n";
+                inputString.append(lines[i].trim().substring(prompt1.length()));
+                inputString.append('\n');
                 i++;
             }
-            String expectedString = "";
+            StringBuilder expectedString = new StringBuilder();
             while (i < lines.length &&
                 !lines[i].trim().startsWith(prompt0)) {
-                expectedString += lines[i] + "\n";
+                expectedString.append(lines[i]).append('\n');
                 i++;
             }
             PrintStream savedOut = this.getOut();
@@ -490,11 +491,12 @@ public class Global extends ImporterTopLevel
             cx.setErrorReporter(new ToolErrorReporter(false, this.getErr()));
             try {
                 testCount++;
-                Object result = cx.evaluateString(scope, inputString,
+                String finalInputString = inputString.toString();
+                Object result = cx.evaluateString(scope, finalInputString,
                     "doctest input", 1, null);
                 if (result != Context.getUndefinedValue() &&
                     !(result instanceof Function &&
-                        inputString.trim().startsWith("function"))) {
+                        finalInputString.trim().startsWith("function"))) {
                     resultString = Context.toString(result);
                 }
             } catch (RhinoException e) {
@@ -505,7 +507,7 @@ public class Global extends ImporterTopLevel
                 cx.setErrorReporter(savedErrorReporter);
                 resultString += err.toString() + out.toString();
             }
-            if (!doctestOutputMatches(expectedString, resultString)) {
+            if (!doctestOutputMatches(expectedString.toString(), resultString)) {
                 String message = "doctest failure running:\n" +
                     inputString +
                     "expected: " + expectedString +
@@ -663,23 +665,23 @@ public class Global extends ImporterTopLevel
      * empty.
      * The following properties of the option object are processed:
      * <ul>
-     * <li><tt>args</tt> - provides an array of additional command arguments
-     * <li><tt>env</tt> - explicit environment object. All its enumerable
+     * <li><code>args</code> - provides an array of additional command arguments
+     * <li><code>env</code> - explicit environment object. All its enumerable
      *   properties define the corresponding environment variable names.
-     * <li><tt>input</tt> - the process input. If it is not
+     * <li><code>input</code> - the process input. If it is not
      *   java.io.InputStream, it is converted to string and sent to the process
      *   as its input. If not specified, no input is provided to the process.
-     * <li><tt>output</tt> - the process output instead of
+     * <li><code>output</code> - the process output instead of
      *   java.lang.System.out. If it is not instance of java.io.OutputStream,
      *   the process output is read, converted to a string, appended to the
      *   output property value converted to string and put as the new value of
      *   the output property.
-     * <li><tt>err</tt> - the process error output instead of
+     * <li><code>err</code> - the process error output instead of
      *   java.lang.System.err. If it is not instance of java.io.OutputStream,
      *   the process error output is read, converted to a string, appended to
      *   the err property value converted to string and put as the new
      *   value of the err property.
-     * <li><tt>dir</tt> - the working direcotry to run the commands.
+     * <li><code>dir</code> - the working direcotry to run the commands.
      * </ul>
      */
     public static Object runCommand(Context cx, Scriptable thisObj,
@@ -764,10 +766,10 @@ public class Global extends ImporterTopLevel
         }
         Global global = getInstance(funObj);
         if (out == null) {
-            out = (global != null) ? global.getOut() : System.out;
+            out = global.getOut();
         }
         if (err == null) {
-            err = (global != null) ? global.getErr() : System.err;
+            err = global.getErr();
         }
         // If no explicit input stream, do not send any input to process,
         // in particular, do not use System.in to avoid deadlocks
@@ -794,7 +796,7 @@ public class Global extends ImporterTopLevel
             ScriptableObject.putProperty(params, "err", s);
         }
 
-        return new Integer(exitCode);
+        return exitCode;
     }
 
     /**

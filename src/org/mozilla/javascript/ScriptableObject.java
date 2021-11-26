@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
+import org.mozilla.javascript.ScriptRuntime.StringIdOrIndex;
 import org.mozilla.javascript.annotations.JSConstructor;
 import org.mozilla.javascript.annotations.JSFunction;
 import org.mozilla.javascript.annotations.JSGetter;
@@ -173,8 +174,7 @@ public abstract class ScriptableObject implements Scriptable,
 
         boolean setValue(Object value, Scriptable owner, Scriptable start) {
             if ((attributes & READONLY) != 0) {
-                Context cx = Context.getContext();
-                if (cx.isStrictMode()) {
+                if (Context.getContext().isStrictMode()) {
                     throw ScriptRuntime.typeError1("msg.modify.readonly", name);
                 }
                 return true;
@@ -213,9 +213,9 @@ public abstract class ScriptableObject implements Scriptable,
         ScriptableObject desc = new NativeObject();
         ScriptRuntime.setBuiltinProtoAndParent(desc, scope, TopLevel.Builtins.Object);
         desc.defineProperty("value", value, EMPTY);
-        desc.defineProperty("writable", (attributes & READONLY) == 0, EMPTY);
-        desc.defineProperty("enumerable", (attributes & DONTENUM) == 0, EMPTY);
-        desc.defineProperty("configurable", (attributes & PERMANENT) == 0, EMPTY);
+        desc.defineProperty("writable", Boolean.valueOf((attributes & READONLY) == 0), EMPTY);
+        desc.defineProperty("enumerable", Boolean.valueOf((attributes & DONTENUM) == 0), EMPTY);
+        desc.defineProperty("configurable", Boolean.valueOf((attributes & PERMANENT) == 0), EMPTY);
         return desc;
     }
 
@@ -240,10 +240,10 @@ public abstract class ScriptableObject implements Scriptable,
             int attr = getAttributes();
             ScriptableObject desc = new NativeObject();
             ScriptRuntime.setBuiltinProtoAndParent(desc, scope, TopLevel.Builtins.Object);
-            desc.defineProperty("enumerable", (attr & DONTENUM) == 0, EMPTY);
-            desc.defineProperty("configurable", (attr & PERMANENT) == 0, EMPTY);
+            desc.defineProperty("enumerable", Boolean.valueOf((attr & DONTENUM) == 0), EMPTY);
+            desc.defineProperty("configurable", Boolean.valueOf((attr & PERMANENT) == 0), EMPTY);
             if (getter == null && setter == null) {
-                desc.defineProperty("writable", (attr & READONLY) == 0, EMPTY);
+                desc.defineProperty("writable", Boolean.valueOf((attr & READONLY) == 0), EMPTY);
             }
 
             String fName = name == null ? "f" : name.toString();
@@ -280,7 +280,7 @@ public abstract class ScriptableObject implements Scriptable,
 
                         String prop = "";
                         if (name != null) {
-                            prop = "[" + start.getClassName() + "]." + name.toString();
+                            prop = "[" + start.getClassName() + "]." + name;
                         }
                         throw ScriptRuntime.typeError2("msg.set.prop.no.setter", prop, Context.toString(value));
                     }
@@ -362,7 +362,7 @@ public abstract class ScriptableObject implements Scriptable,
         }
     }
 
-    private SlotMapContainer createSlotMap(int initialSize)
+    private static SlotMapContainer createSlotMap(int initialSize)
     {
         Context cx = Context.getCurrentContext();
         if ((cx != null) && cx.hasFeature(Context.FEATURE_THREAD_SAFE_OBJECTS)) {
@@ -945,7 +945,7 @@ public abstract class ScriptableObject implements Scriptable,
      */
     public Object getExternalArrayLength()
     {
-        return (externalData == null ? 0 : externalData.getArrayLength());
+        return Integer.valueOf(externalData == null ? 0 : externalData.getArrayLength());
     }
 
     /**
@@ -963,6 +963,10 @@ public abstract class ScriptableObject implements Scriptable,
     @Override
     public void setPrototype(Scriptable m)
     {
+        if (!isExtensible()
+                && Context.getContext().getLanguageVersion() >= Context.VERSION_1_8) {
+            throw ScriptRuntime.typeError0("msg.not.extensible");
+        }
         prototypeObject = m;
     }
 
@@ -1119,17 +1123,17 @@ public abstract class ScriptableObject implements Scriptable,
     }
 
     /**
-     * Custom <tt>==</tt> operator.
+     * Custom <code>==</code> operator.
      * Must return {@link Scriptable#NOT_FOUND} if this object does not
      * have custom equality operator for the given value,
-     * <tt>Boolean.TRUE</tt> if this object is equivalent to <tt>value</tt>,
-     * <tt>Boolean.FALSE</tt> if this object is not equivalent to
-     * <tt>value</tt>.
+     * <code>Boolean.TRUE</code> if this object is equivalent to <code>value</code>,
+     * <code>Boolean.FALSE</code> if this object is not equivalent to
+     * <code>value</code>.
      * <p>
      * The default implementation returns Boolean.TRUE
-     * if <tt>this == value</tt> or {@link Scriptable#NOT_FOUND} otherwise.
+     * if <code>this == value</code> or {@link Scriptable#NOT_FOUND} otherwise.
      * It indicates that by default custom equality is available only if
-     * <tt>value</tt> is <tt>this</tt> in which case true is returned.
+     * <code>value</code> is <code>this</code> in which case true is returned.
      */
     protected Object equivalentValues(Object value)
     {
@@ -2181,6 +2185,11 @@ public abstract class ScriptableObject implements Scriptable,
                 TopLevel.Builtins.Function);
     }
 
+    public static Scriptable getGeneratorFunctionPrototype(Scriptable scope) {
+        return TopLevel.getBuiltinPrototype(getTopLevelScope(scope),
+                TopLevel.Builtins.GeneratorFunction);
+    }
+
     public static Scriptable getArrayPrototype(Scriptable scope) {
         return TopLevel.getBuiltinPrototype(getTopLevelScope(scope),
                 TopLevel.Builtins.Array);
@@ -2807,20 +2816,30 @@ public abstract class ScriptableObject implements Scriptable,
         Slot slot;
         if (this != start) {
             slot = slotMap.query(key, index);
-            if(!isExtensible && Context.getContext().isStrictMode() && (slot == null || !(slot instanceof GetterSlot)))
+            if(!isExtensible
+                    && (slot == null
+                        || (!(slot instanceof GetterSlot)
+                                && (slot.getAttributes() & READONLY) != 0))
+                    && Context.getContext().isStrictMode()) {
                 throw ScriptRuntime.typeError0("msg.not.extensible");
+            }
             if (slot == null) {
                 return false;
             }
         } else if (!isExtensible) {
             slot = slotMap.query(key, index);
-            if(Context.getContext().isStrictMode() && (slot == null || !(slot instanceof GetterSlot)))
+            if((slot == null
+                        || (!(slot instanceof GetterSlot) && (slot.getAttributes() & READONLY) != 0))
+                    && Context.getContext().isStrictMode()) {
                 throw ScriptRuntime.typeError0("msg.not.extensible");
+            }
             if (slot == null) {
                 return true;
             }
         } else {
-            if (isSealed) checkNotSealed(key, index);
+            if (isSealed) {
+                checkNotSealed(key, index);
+            }
             slot = slotMap.get(key, index, SlotAccess.MODIFY);
         }
         return slot.setValue(value, this, start);
@@ -2996,11 +3015,11 @@ public abstract class ScriptableObject implements Scriptable,
         if (id instanceof Symbol) {
             return slotMap.get(id, 0, accessType);
         }
-        String name = ScriptRuntime.toStringIdOrIndex(cx, id);
-        if (name == null) {
-            return slotMap.get(null, ScriptRuntime.lastIndexResult(cx), accessType);
+        StringIdOrIndex s = ScriptRuntime.toStringIdOrIndex(cx, id);
+        if (s.stringId == null) {
+            return slotMap.get(null, s.index, accessType);
         }
-        return slotMap.get(name, 0, accessType);
+        return slotMap.get(s.stringId, 0, accessType);
     }
 
     // Partial implementation of java.util.Map. See NativeObject for
@@ -3052,8 +3071,8 @@ public abstract class ScriptableObject implements Scriptable,
         {
             if (o1 instanceof Integer) {
                 if (o2 instanceof Integer) {
-                    int i1 = (Integer) o1;
-                    int i2 = (Integer) o2;
+                    int i1 = ((Integer) o1).intValue();
+                    int i2 = ((Integer) o2).intValue();
                     if (i1 < i2) {
                         return -1;
                     }

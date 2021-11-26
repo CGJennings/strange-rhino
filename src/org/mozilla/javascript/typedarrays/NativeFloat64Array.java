@@ -36,7 +36,7 @@ public class NativeFloat64Array
 
     public NativeFloat64Array(int len)
     {
-        this(new NativeArrayBuffer(len * BYTES_PER_ELEMENT), 0, len);
+        this(new NativeArrayBuffer((double)len * BYTES_PER_ELEMENT), 0, len);
     }
 
     @Override
@@ -79,7 +79,7 @@ public class NativeFloat64Array
             return Undefined.instance;
         }
         long base = ByteIo.readUint64Primitive(arrayBuffer.buffer, (index * BYTES_PER_ELEMENT) + offset, useLittleEndian());
-        return Double.longBitsToDouble(base);
+        return Double.valueOf(Double.longBitsToDouble(base));
     }
 
     @Override

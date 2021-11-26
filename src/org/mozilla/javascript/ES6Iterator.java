@@ -10,7 +10,7 @@ public abstract class ES6Iterator extends IdScriptableObject {
 
     private static final long serialVersionUID = 2438373029140003950L;
 
-    static void init(ScriptableObject scope, boolean sealed, IdScriptableObject prototype, String tag) {
+    protected static void init(ScriptableObject scope, boolean sealed, IdScriptableObject prototype, String tag) {
         if (scope != null) {
             prototype.setParentScope(scope);
             prototype.setPrototype(getObjectPrototype(scope));
@@ -32,9 +32,9 @@ public abstract class ES6Iterator extends IdScriptableObject {
     protected boolean exhausted = false;
     private String tag;
 
-    ES6Iterator() {}
+    protected ES6Iterator() {}
 
-    ES6Iterator(Scriptable scope, String tag) {
+    protected ES6Iterator(Scriptable scope, String tag) {
         // Set parent and prototype properties. Since we don't have a
         // "Iterator" constructor in the top scope, we stash the
         // prototype in the top scope's associated value.
@@ -99,7 +99,7 @@ public abstract class ES6Iterator extends IdScriptableObject {
 
     @Override
     protected int findPrototypeId(String s) {
-        if ("next".equals(s)) {
+        if (NEXT_METHOD.equals(s)) {
             return Id_next;
         }
         return 0;
@@ -117,7 +117,7 @@ public abstract class ES6Iterator extends IdScriptableObject {
         } else {
             this.exhausted = true;
         }
-        return makeIteratorResult(cx, scope, done, value);
+        return makeIteratorResult(cx, scope, Boolean.valueOf(done), value);
     }
 
     protected String getTag() {
@@ -125,8 +125,12 @@ public abstract class ES6Iterator extends IdScriptableObject {
     }
 
     // 25.1.1.3 The IteratorResult Interface
-    private Scriptable makeIteratorResult(Context cx, Scriptable scope, boolean done, Object value) {
-        Scriptable iteratorResult = cx.newObject(scope);
+    static Scriptable makeIteratorResult(Context cx, Scriptable scope, Boolean done) {
+        return makeIteratorResult(cx, scope, done, Undefined.instance);
+    }
+
+    static Scriptable makeIteratorResult(Context cx, Scriptable scope, Boolean done, Object value) {
+        final Scriptable iteratorResult = cx.newObject(scope);
         ScriptableObject.putProperty(iteratorResult, VALUE_PROPERTY, value);
         ScriptableObject.putProperty(iteratorResult, DONE_PROPERTY, done);
         return iteratorResult;
@@ -142,4 +146,5 @@ public abstract class ES6Iterator extends IdScriptableObject {
     public static final String DONE_PROPERTY = "done";
     public static final String RETURN_PROPERTY = "return";
     public static final String VALUE_PROPERTY = "value";
+    public static final String RETURN_METHOD = "return";
 }

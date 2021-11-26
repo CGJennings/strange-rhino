@@ -98,7 +98,15 @@ class SpecialRef extends Ref
                     } while (search != null);
                 }
                 if (type == SPECIAL_PROTO) {
-                    target.setPrototype(obj);
+                    if (cx.getLanguageVersion() >= Context.VERSION_ES6) {
+                        if ((value != null && !"object".equals(ScriptRuntime.typeof(value))) ||
+                            !"object".equals(ScriptRuntime.typeof(target))) {
+                            return Undefined.instance;
+                        }
+                        target.setPrototype(obj);
+                    } else {
+                        target.setPrototype(obj);
+                    }
                 } else {
                     target.setParentScope(obj);
                 }

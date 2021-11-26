@@ -9,6 +9,7 @@ package org.mozilla.javascript;
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.text.MessageFormat;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
@@ -193,7 +194,7 @@ public class ScriptRuntime {
         NativeCall.init(scope, sealed);
         NativeScript.init(scope, sealed);
 
-        NativeIterator.init(scope, sealed); // Also initializes NativeGenerator
+        NativeIterator.init(cx, scope, sealed); // Also initializes NativeGenerator & ES6Generator
 
         NativeArrayIterator.init(scope, sealed);
         NativeStringIterator.init(scope, sealed);
@@ -265,7 +266,7 @@ public class ScriptRuntime {
         }
 
         if (scope instanceof TopLevel) {
-            ((TopLevel)scope).cacheBuiltins();
+            ((TopLevel)scope).cacheBuiltins(scope, sealed);
         }
 
         return scope;
@@ -360,7 +361,7 @@ public class ScriptRuntime {
 
     public static Boolean wrapBoolean(boolean b)
     {
-        return b ? Boolean.TRUE : Boolean.FALSE;
+        return Boolean.valueOf(b);
     }
 
     public static Integer wrapInt(int i)
@@ -373,7 +374,7 @@ public class ScriptRuntime {
         if (Double.isNaN(x)) {
             return ScriptRuntime.NaNobj;
         }
-        return new Double(x);
+        return Double.valueOf(x);
     }
 
     /**
@@ -453,11 +454,13 @@ public class ScriptRuntime {
     }
 
     public static final double NaN = Double.NaN;
+    public static final Double NaNobj = Double.valueOf(NaN);
 
     // Preserve backward-compatibility with historical value of this.
     public static final double negativeZero = Double.longBitsToDouble(0x8000000000000000L);
 
-    public static final Double NaNobj = new Double(NaN);
+    public static final Double zeroObj = Double.valueOf(0.0);
+    public static final Double negativeZeroObj = Double.valueOf(-0.0);
 
     static double stringPrefixToNumber(String s, int start, int radix) {
         return stringToNumber(s, start, s.length() - 1, radix, true);
@@ -737,16 +740,11 @@ public class ScriptRuntime {
         if (count < args.length)
             return args;
 
-        int i;
         Object[] result = new Object[count];
-        for (i = 0; i < args.length; i++) {
-            result[i] = args[i];
+        System.arraycopy(args, 0, result, 0, args.length);
+        if (args.length < count) {
+            Arrays.fill(result, args.length, count, Undefined.instance);
         }
-
-        for (; i < count; i++) {
-            result[i] = Undefined.instance;
-        }
-
         return result;
     }
 
@@ -1163,7 +1161,7 @@ public class ScriptRuntime {
         Function function = (Function)fun;
         Scriptable thisObj = toObjectOrNull(cx, thisArg, scope);
         if (thisObj == null) {
-            throw undefCallError(thisObj, "function");
+            throw undefCallError(null, "function");
         }
         return function.call(cx, scope, thisObj, args);
     }
@@ -1465,20 +1463,41 @@ public class ScriptRuntime {
     }
 
     /**
+     * Helper to return a string or an integer.
+     * Always use a null check on s.stringId to determine
+     * if the result is string or integer.
+     *
+     * @see ScriptRuntime#toStringIdOrIndex(Context, Object)
+     */
+    static final class StringIdOrIndex {
+        final String stringId;
+        final int index;
+
+        StringIdOrIndex(String stringId) {
+            this.stringId = stringId;
+            this.index = -1;
+        }
+
+        StringIdOrIndex(int index) {
+            this.stringId = null;
+            this.index = index;
+        }
+    }
+
+    /**
      * If toString(id) is a decimal presentation of int32 value, then id
      * is index. In this case return null and make the index available
      * as ScriptRuntime.lastIndexResult(cx). Otherwise return toString(id).
      */
-    static String toStringIdOrIndex(Context cx, Object id)
+    static StringIdOrIndex toStringIdOrIndex(Context cx, Object id)
     {
         if (id instanceof Number) {
             double d = ((Number)id).doubleValue();
             int index = (int)d;
             if (index == d) {
-                storeIndexResult(cx, index);
-                return null;
+                return new StringIdOrIndex(index);
             }
-            return toString(id);
+            return new StringIdOrIndex(toString(id));
         }
         String s;
         if (id instanceof String) {
@@ -1488,10 +1507,9 @@ public class ScriptRuntime {
         }
         long indexTest = indexFromString(s);
         if (indexTest >= 0) {
-            storeIndexResult(cx, (int)indexTest);
-            return null;
+            return new StringIdOrIndex((int)indexTest);
         }
-        return s;
+        return new StringIdOrIndex(s);
     }
 
     /**
@@ -1528,12 +1546,12 @@ public class ScriptRuntime {
         } else if (isSymbol(elem)) {
             result = ScriptableObject.getProperty(obj, (Symbol)elem);
         } else {
-            String s = toStringIdOrIndex(cx, elem);
-            if (s == null) {
-                int index = lastIndexResult(cx);
+            StringIdOrIndex s = toStringIdOrIndex(cx, elem);
+            if (s.stringId == null) {
+                int index = s.index;
                 result = ScriptableObject.getProperty(obj, index);
             } else {
-                result = ScriptableObject.getProperty(obj, s);
+                result = ScriptableObject.getProperty(obj, s.stringId);
             }
         }
 
@@ -1688,12 +1706,11 @@ public class ScriptRuntime {
         } else if (isSymbol(elem)) {
             ScriptableObject.putProperty(obj, (Symbol)elem, value);
         } else {
-            String s = toStringIdOrIndex(cx, elem);
-            if (s == null) {
-                int index = lastIndexResult(cx);
-                ScriptableObject.putProperty(obj, index, value);
+            StringIdOrIndex s = toStringIdOrIndex(cx, elem);
+            if (s.stringId == null) {
+                ScriptableObject.putProperty(obj, s.index, value);
             } else {
-                ScriptableObject.putProperty(obj, s, value);
+                ScriptableObject.putProperty(obj, s.stringId, value);
             }
         }
 
@@ -1719,10 +1736,17 @@ public class ScriptRuntime {
                                        Object value, Context cx,
                                        Scriptable scope)
     {
+        if (!(obj instanceof Scriptable)
+                && cx.isStrictMode()
+                && cx.getLanguageVersion() >= Context.VERSION_1_8) {
+            throw undefWriteError(obj, property, value);
+        }
+
         Scriptable sobj = toObjectOrNull(cx, obj, scope);
         if (sobj == null) {
             throw undefWriteError(obj, property, value);
         }
+
         return setObjectProp(sobj, property, value, cx);
     }
 
@@ -1783,14 +1807,13 @@ public class ScriptRuntime {
             so.delete(s);
             return !so.has(s, target);
         }
-        String s = toStringIdOrIndex(cx, elem);
-        if (s == null) {
-            int index = lastIndexResult(cx);
-            target.delete(index);
-            return !target.has(index, target);
+        StringIdOrIndex s = toStringIdOrIndex(cx, elem);
+        if (s.stringId == null) {
+            target.delete(s.index);
+            return !target.has(s.index, target);
         }
-        target.delete(s);
-        return !target.has(s, target);
+        target.delete(s.stringId);
+        return !target.has(s.stringId, target);
     }
 
     public static boolean hasObjectElem(Scriptable target, Object elem,
@@ -1801,12 +1824,11 @@ public class ScriptRuntime {
         if (isSymbol(elem)) {
             result = ScriptableObject.hasProperty(target, (Symbol)elem);
         } else {
-            String s = toStringIdOrIndex(cx, elem);
-            if (s == null) {
-                int index = lastIndexResult(cx);
-                result = ScriptableObject.hasProperty(target, index);
+            StringIdOrIndex s = toStringIdOrIndex(cx, elem);
+            if (s.stringId == null) {
+                result = ScriptableObject.hasProperty(target, s.index);
             } else {
-                result = ScriptableObject.hasProperty(target, s);
+                result = ScriptableObject.hasProperty(target, s.stringId);
             }
         }
 
@@ -2348,7 +2370,7 @@ public class ScriptRuntime {
         Object r = f.call(cx, scope, enumObj.iterator, emptyArgs);
         Scriptable iteratorResult = toObject(cx, scope, r);
         Object done = ScriptableObject.getProperty(iteratorResult, ES6Iterator.DONE_PROPERTY);
-        if (done != ScriptableObject.NOT_FOUND && toBoolean(done)) {
+        if (done != Scriptable.NOT_FOUND && toBoolean(done)) {
             return Boolean.FALSE;
         }
         enumObj.currentId = ScriptableObject.getProperty(iteratorResult, ES6Iterator.VALUE_PROPERTY);
@@ -2386,12 +2408,11 @@ public class ScriptRuntime {
             SymbolScriptable so = ScriptableObject.ensureSymbolScriptable(x.obj);
             result = so.get((Symbol)x.currentId, x.obj);
         } else {
-            String s = toStringIdOrIndex(cx, x.currentId);
-            if (s == null) {
-                int index = lastIndexResult(cx);
-                result = x.obj.get(index, x.obj);
+            StringIdOrIndex s = toStringIdOrIndex(cx, x.currentId);
+            if (s.stringId == null) {
+                result = x.obj.get(s.index, x.obj);
             } else {
-                result = x.obj.get(s, x.obj);
+                result = x.obj.get(s.stringId, x.obj);
             }
         }
 
@@ -2490,18 +2511,17 @@ public class ScriptRuntime {
             value = ScriptableObject.getProperty(thisObj, (Symbol)elem);
 
         } else {
-            String str = toStringIdOrIndex(cx, elem);
-            if (str != null) {
-                return getPropFunctionAndThis(obj, str, cx, scope);
+            StringIdOrIndex s = toStringIdOrIndex(cx, elem);
+            if (s.stringId != null) {
+                return getPropFunctionAndThis(obj, s.stringId, cx, scope);
             }
-            int index = lastIndexResult(cx);
 
             thisObj = toObjectOrNull(cx, obj, scope);
             if (thisObj == null) {
                 throw undefCallError(obj, String.valueOf(elem));
             }
 
-            value = ScriptableObject.getProperty(thisObj, index);
+            value = ScriptableObject.getProperty(thisObj, s.index);
         }
 
         if (!(value instanceof Callable)) {
@@ -2614,6 +2634,19 @@ public class ScriptRuntime {
                 ScriptRuntime.getElemFunctionAndThis(obj, SymbolKey.ITERATOR, cx, scope);
         final Scriptable iterable = ScriptRuntime.lastStoredScriptable(cx);
         return getIterator.call(cx, scope, iterable, ScriptRuntime.emptyArgs);
+    }
+
+    /**
+     * Given an iterator result, return true if and only if there is a "done"
+     * property that's true.
+     */
+    public static boolean isIteratorDone(Context cx, Object result)
+    {
+        if (!(result instanceof Scriptable)) {
+            return false;
+        }
+        final Object prop = getObjectProp((Scriptable)result, ES6Iterator.DONE_PROPERTY, cx);
+        return toBoolean(prop);
     }
 
     /**
@@ -2975,7 +3008,7 @@ public class ScriptRuntime {
                 } while (target != null);
                 scopeChain = scopeChain.getParentScope();
             } while (scopeChain != null);
-            throw notFoundError(scopeChain, id);
+            throw notFoundError(null, id);
         }
         return doScriptableIncrDecr(target, id, scopeChain, value,
                                     incrDecrMask);
@@ -3023,7 +3056,7 @@ public class ScriptRuntime {
                                                Object value,
                                                int incrDecrMask)
     {
-        boolean post = ((incrDecrMask & Node.POST_FLAG) != 0);
+        final boolean post = (incrDecrMask & Node.POST_FLAG) != 0;
         double number;
         if (value instanceof Number) {
             number = ((Number)value).doubleValue();
@@ -3062,7 +3095,7 @@ public class ScriptRuntime {
                                       int incrDecrMask)
     {
         Object value = getObjectElem(obj, index, cx, scope);
-        boolean post = ((incrDecrMask & Node.POST_FLAG) != 0);
+        final boolean post = (incrDecrMask & Node.POST_FLAG) != 0;
         double number;
         if (value instanceof Number) {
             number = ((Number)value).doubleValue();
@@ -3265,10 +3298,10 @@ public class ScriptRuntime {
 
     public static boolean isNaN(Object n) {
         if (n instanceof Double) {
-            return Double.isNaN((Double)n);
+            return ((Double)n).isNaN();
         }
         if (n instanceof Float) {
-            return Float.isNaN((Float)n);
+            return ((Float)n).isNaN();
         }
         return false;
     }
@@ -3559,10 +3592,10 @@ public class ScriptRuntime {
     }
 
     /**
-     * Return <tt>possibleDynamicScope</tt> if <tt>staticTopScope</tt>
-     * is present on its prototype chain and return <tt>staticTopScope</tt>
+     * Return <code>possibleDynamicScope</code> if <code>staticTopScope</code>
+     * is present on its prototype chain and return <code>staticTopScope</code>
      * otherwise.
-     * Should only be called when <tt>staticTopScope</tt> is top scope.
+     * Should only be called when <code>staticTopScope</code> is top scope.
      */
     static Scriptable checkDynamicScope(Scriptable possibleDynamicScope,
                                         Scriptable staticTopScope)
@@ -3928,8 +3961,19 @@ public class ScriptRuntime {
     public static void setFunctionProtoAndParent(BaseFunction fn,
                                                  Scriptable scope)
     {
+        setFunctionProtoAndParent(fn, scope, false);
+    }
+
+    public static void setFunctionProtoAndParent(BaseFunction fn,
+                                                Scriptable scope,
+                                                boolean es6GeneratorFunction)
+    {
         fn.setParentScope(scope);
-        fn.setPrototype(ScriptableObject.getFunctionPrototype(scope));
+        if (es6GeneratorFunction) {
+            fn.setPrototype(ScriptableObject.getGeneratorFunctionPrototype(scope));
+        } else {
+            fn.setPrototype(ScriptableObject.getFunctionPrototype(scope));
+        }
     }
 
     public static void setObjectProtoAndParent(ScriptableObject object,
@@ -4458,16 +4502,6 @@ public class ScriptRuntime {
         return xmlLib.nameRef(cx, namespace, name, scope, memberTypeFlags);
     }
 
-    private static void storeIndexResult(Context cx, int index)
-    {
-        cx.scratchIndex = index;
-    }
-
-    static int lastIndexResult(Context cx)
-    {
-        return cx.scratchIndex;
-    }
-
     public static void storeUint32Result(Context cx, long value)
     {
         if ((value >>> 32) != 0)
@@ -4519,8 +4553,8 @@ public class ScriptRuntime {
      * by using an "instanceof" check.
      */
     static boolean isSymbol(Object obj) {
-        return (((obj instanceof NativeSymbol) &&
-                ((NativeSymbol)obj).isSymbol())) || (obj instanceof SymbolKey);
+        return (( (obj instanceof NativeSymbol) && ((NativeSymbol)obj).isSymbol()))
+                    || (obj instanceof SymbolKey);
     }
 
     private static RuntimeException errorWithClassName(String msg, Object val)

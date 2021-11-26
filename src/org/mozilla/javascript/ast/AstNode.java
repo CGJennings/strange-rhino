@@ -437,6 +437,7 @@ public abstract class AstNode extends Node implements Comparable<AstNode> {
           case Token.WITH:
           case Token.WITHEXPR:
           case Token.YIELD:
+          case Token.YIELD_STAR:
             return true;
 
           default:
@@ -566,7 +567,8 @@ public abstract class AstNode extends Node implements Comparable<AstNode> {
         public String toString() {
             return buffer.toString();
         }
-        private String makeIndent(int depth) {
+
+        private static String makeIndent(int depth) {
             StringBuilder sb = new StringBuilder(DEBUG_INDENT * depth);
             for (int i = 0; i < (DEBUG_INDENT * depth); i++) {
                 sb.append(" ");

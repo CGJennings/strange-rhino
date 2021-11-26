@@ -32,7 +32,7 @@ public abstract class NativeArrayBufferView
 
     public NativeArrayBufferView()
     {
-        arrayBuffer = NativeArrayBuffer.EMPTY_BUFFER;
+        arrayBuffer = new NativeArrayBuffer();
         offset = 0;
         byteLength = 0;
     }
@@ -72,7 +72,7 @@ public abstract class NativeArrayBufferView
             if (ctx == null) {
                 return false;
             }
-            useLittleEndian = ctx.hasFeature(Context.FEATURE_LITTLE_ENDIAN);
+            useLittleEndian = Boolean.valueOf(ctx.hasFeature(Context.FEATURE_LITTLE_ENDIAN));
         }
         return useLittleEndian.booleanValue();
     }

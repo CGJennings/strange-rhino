@@ -105,31 +105,32 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
     private NativeArrayBuffer makeArrayBuffer(Context cx, Scriptable scope, int length)
     {
         return (NativeArrayBuffer)cx.newObject(scope, NativeArrayBuffer.CLASS_NAME,
-                                               new Object[] { length });
+                                               new Object[] { Double.valueOf((double)length * getBytesPerElement()) });
     }
 
     private NativeTypedArrayView<T> js_constructor(Context cx, Scriptable scope, Object[] args)
     {
         if (!isArg(args, 0)) {
-            return construct(NativeArrayBuffer.EMPTY_BUFFER, 0, 0);
+            return construct(new NativeArrayBuffer(), 0, 0);
         }
 
         final Object arg0 = args[0];
         if (arg0 == null) {
-            return construct(NativeArrayBuffer.EMPTY_BUFFER, 0, 0);
+            return construct(new NativeArrayBuffer(), 0, 0);
         }
 
         if ((arg0 instanceof Number) || (arg0 instanceof String)) {
             // Create a zeroed-out array of a certain length
             int length = ScriptRuntime.toInt32(arg0);
-            NativeArrayBuffer buffer = makeArrayBuffer(cx, scope, length * getBytesPerElement());
+            NativeArrayBuffer buffer = makeArrayBuffer(cx, scope, length);
             return construct(buffer, 0, length);
         }
 
         if (arg0 instanceof NativeTypedArrayView) {
             // Copy elements from the old array and convert them into our own
+            @SuppressWarnings("unchecked")
             NativeTypedArrayView<T> src = (NativeTypedArrayView<T>)arg0;
-            NativeArrayBuffer na = makeArrayBuffer(cx, scope, src.length * getBytesPerElement());
+            NativeArrayBuffer na = makeArrayBuffer(cx, scope, src.length);
             NativeTypedArrayView<T> v = construct(na, 0, src.length);
 
             for (int i = 0; i < src.length; i++) {
@@ -151,16 +152,16 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
             }
 
             if ((byteOff < 0) || (byteOff > na.buffer.length)) {
-                throw ScriptRuntime.constructError("RangeError", "offset out of range");
+                throw ScriptRuntime.rangeError("offset out of range");
             }
             if ((byteLen < 0) || ((byteOff + byteLen) > na.buffer.length)) {
-                throw ScriptRuntime.constructError("RangeError", "length out of range");
+                throw ScriptRuntime.rangeError("length out of range");
             }
             if ((byteOff % getBytesPerElement()) != 0) {
-                throw ScriptRuntime.constructError("RangeError", "offset must be a multiple of the byte size");
+                throw ScriptRuntime.rangeError("offset must be a multiple of the byte size");
             }
             if ((byteLen % getBytesPerElement()) != 0) {
-                throw ScriptRuntime.constructError("RangeError", "offset and buffer must be a multiple of the byte size");
+                throw ScriptRuntime.rangeError("offset and buffer must be a multiple of the byte size");
             }
 
             return construct(na, byteOff, byteLen / getBytesPerElement());
@@ -170,14 +171,14 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
             // Copy elements of the array and convert them to the correct type
             NativeArray array = (NativeArray) arg0;
 
-            NativeArrayBuffer na = makeArrayBuffer(cx, scope, array.size() * getBytesPerElement());
+            NativeArrayBuffer na = makeArrayBuffer(cx, scope, array.size());
             NativeTypedArrayView<T> v = construct(na, 0, array.size());
             for (int i = 0; i < array.size(); i++) {
                 // we have to call this here to get the raw value;
                 // null has to be forewoded as null
                 final Object value = array.get(i, array);
                 if (value == Scriptable.NOT_FOUND || value == Undefined.instance) {
-                    v.js_set(i, Double.NaN);
+                    v.js_set(i, ScriptRuntime.NaNobj);
                 }
                 else if (value instanceof Wrapper) {
                     v.js_set(i, ((Wrapper) value).unwrap());
@@ -193,7 +194,7 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
             // Copy elements of the array and convert them to the correct type
             Object[] arrayElements = ScriptRuntime.getArrayElements((Scriptable)arg0);
 
-            NativeArrayBuffer na = makeArrayBuffer(cx, scope, arrayElements.length * getBytesPerElement());
+            NativeArrayBuffer na = makeArrayBuffer(cx, scope, arrayElements.length);
             NativeTypedArrayView<T> v = construct(na, 0, arrayElements.length);
             for (int i = 0; i < arrayElements.length; i++) {
                 v.js_set(i, arrayElements[i]);
@@ -206,11 +207,11 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
     private void setRange(NativeTypedArrayView<T> v, int off)
     {
         if (off >= length) {
-            throw ScriptRuntime.constructError("RangeError", "offset out of range");
+            throw ScriptRuntime.rangeError("offset out of range");
         }
 
         if (v.length > (length - off)) {
-            throw ScriptRuntime.constructError("RangeError", "source array too long");
+            throw ScriptRuntime.rangeError("source array too long");
         }
 
         if (v.arrayBuffer == arrayBuffer) {
@@ -232,10 +233,10 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
     private void setRange(NativeArray a, int off)
     {
         if (off > length) {
-            throw ScriptRuntime.constructError("RangeError", "offset out of range");
+            throw ScriptRuntime.rangeError("offset out of range");
         }
         if ((off + a.size()) > length) {
-            throw ScriptRuntime.constructError("RangeError", "offset + length out of range");
+            throw ScriptRuntime.rangeError("offset + length out of range");
         }
 
         int pos = off;
@@ -258,7 +259,7 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
 
         return
             cx.newObject(scope, getClassName(),
-                         new Object[]{arrayBuffer, byteOff, len});
+                         new Object[]{arrayBuffer, Integer.valueOf(byteOff), Integer.valueOf(len)});
     }
 
     // Dispatcher
@@ -273,6 +274,9 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
         int id = f.methodId();
         switch (id) {
         case Id_constructor:
+            if (thisObj != null && cx.getLanguageVersion() >= Context.VERSION_ES6) {
+                throw ScriptRuntime.typeError1("msg.only.from.new", getClassName());
+            }
             return js_constructor(cx, scope, args);
 
         case Id_toString:
@@ -299,7 +303,9 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
                 NativeTypedArrayView<T> self = realThis(thisObj, f);
                 if (args[0] instanceof NativeTypedArrayView) {
                     int offset = isArg(args, 1) ? ScriptRuntime.toInt32(args[1]) : 0;
-                    self.setRange((NativeTypedArrayView<T>)args[0], offset);
+                    @SuppressWarnings("unchecked")
+                    NativeTypedArrayView<T> nativeView = (NativeTypedArrayView<T>)args[0];
+                    self.setRange(nativeView, offset);
                     return Undefined.instance;
                 }
                 if (args[0] instanceof NativeArray) {
@@ -547,7 +553,7 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
         return a;
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "unchecked"})
     @Override
     public <U> U[] toArray(U[] ts)
     {
@@ -568,7 +574,7 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
         }
         return a;
     }
-    
+
 
     @SuppressWarnings("unused")
     @Override
@@ -592,6 +598,7 @@ public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView impl
     }
 
 
+    @SuppressWarnings("unchecked")
     @Override
     public boolean equals(Object o)
     {

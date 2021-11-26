@@ -333,7 +333,7 @@ public class Parser
     // Computes the absolute end offset of node N.
     // Use with caution!  Assumes n.getPosition() is -absolute-, which
     // is only true before the node is added to its parent.
-    private int getNodeEnd(AstNode n) {
+    private static int getNodeEnd(AstNode n) {
         return n.getPosition() + n.getLength();
     }
 
@@ -362,17 +362,6 @@ public class Parser
         Comment saved = currentJsDocComment;
         currentJsDocComment = null;
         return saved;
-    }
-
-
-    private int getNumberOfEols(String comment) {
-      int lines = 0;
-      for (int i = comment.length()-1; i >= 0; i--) {
-        if (comment.charAt(i) == '\n') {
-          lines++;
-        }
-      }
-      return lines;
     }
 
 
@@ -414,11 +403,9 @@ public class Parser
                 if (compilerEnv.isRecordingComments()) {
                     String comment = ts.getAndResetCurrentComment();
                     recordComment(lineno, comment);
-                    // Comments may contain multiple lines, get the number
-                    // of EoLs and increase the lineno
-                    lineno += getNumberOfEols(comment);
                     break;
-                }tt = ts.getToken();
+                }
+                tt = ts.getToken();
             }
         }
 
@@ -716,9 +703,13 @@ public class Parser
         int pos = ts.tokenBeg;
         Block pn = new Block(pos);  // starts at LC position
 
+        // Function code that is supplied as the arguments to the built-in
+        // Function, Generator, and AsyncFunction constructors is strict mode code
+        // if the last argument is a String that when processed is a FunctionBody
+        // that begins with a Directive Prologue that contains a Use Strict Directive.
         boolean inDirectivePrologue = true;
         boolean savedStrictMode = inUseStrictDirective;
-        // Don't set 'inUseStrictDirective' to false: inherit strict mode.
+        inUseStrictDirective = false;
 
         pn.setLineno(ts.lineno);
         try {
@@ -783,7 +774,7 @@ public class Parser
         return pn;
     }
 
-    private String getDirective(AstNode n) {
+    private static String getDirective(AstNode n) {
         if (n instanceof ExpressionStatement) {
             AstNode e = ((ExpressionStatement) n).getExpression();
             if (e instanceof StringLiteral) {
@@ -863,6 +854,11 @@ public class Parser
     }
 
     private FunctionNode function(int type)
+        throws IOException {
+        return function(type, false);
+    }
+
+    private FunctionNode function(int type, boolean isGenerator)
         throws IOException
     {
         int syntheticType = type;
@@ -889,6 +885,10 @@ public class Parser
             }
         } else if (matchToken(Token.LP, true)) {
             // Anonymous function:  leave name as null
+        } else if (matchToken(Token.MUL, true) &&
+                   (compilerEnv.getLanguageVersion() >= Context.VERSION_ES6)) {
+            // ES6 generator function
+            return function(type, true);
         } else {
             if (compilerEnv.isAllowMemberExprAsFunctionName()) {
                 // Note that memberExpr can not start with '(' like
@@ -912,6 +912,9 @@ public class Parser
 
         FunctionNode fnNode = new FunctionNode(functionSourceStart, name);
         fnNode.setFunctionType(type);
+        if (isGenerator) {
+            fnNode.setIsES6Generator();
+        }
         if (lpPos != -1)
             fnNode.setLp(lpPos - functionSourceStart);
 
@@ -1913,12 +1916,26 @@ public class Parser
         consumeToken();
         int lineno = ts.lineno, pos = ts.tokenBeg, end = ts.tokenEnd;
 
+        boolean yieldStar = false;
+        if ((tt == Token.YIELD) &&
+            (compilerEnv.getLanguageVersion() >= Context.VERSION_ES6) &&
+            (peekToken() == Token.MUL)) {
+          yieldStar = true;
+          consumeToken();
+        }
+
         AstNode e = null;
         // This is ugly, but we don't want to require a semicolon.
         switch (peekTokenOrEOL()) {
           case Token.SEMI: case Token.RC:  case Token.RB:    case Token.RP:
-          case Token.EOF:  case Token.EOL: case Token.ERROR: case Token.YIELD:
+          case Token.EOF:  case Token.EOL: case Token.ERROR:
             break;
+          case Token.YIELD:
+            if (compilerEnv.getLanguageVersion() < Context.VERSION_ES6) {
+                // Take extra care to preserve language compatibility
+                break;
+            }
+            // fallthrough
           default:
             e = expr();
             end = getNodeEnd(e);
@@ -1939,7 +1956,7 @@ public class Parser
             if (!insideFunction())
                 reportError("msg.bad.yield");
             endFlags |= Node.END_YIELDS;
-            ret = new Yield(pos, end - pos, e);
+            ret = new Yield(pos, end - pos, e, yieldStar);
             setRequiresActivation();
             setIsGenerator();
             if (!exprContext) {
@@ -1951,11 +1968,15 @@ public class Parser
         if (insideFunction()
             && nowAllSet(before, endFlags,
                     Node.END_YIELDS|Node.END_RETURNS_VALUE)) {
-            Name name = ((FunctionNode)currentScriptOrFn).getFunctionName();
-            if (name == null || name.length() == 0)
-                addError("msg.anon.generator.returns", "");
-            else
-                addError("msg.generator.returns", name.getIdentifier());
+            FunctionNode fn = (FunctionNode)currentScriptOrFn;
+            if (!fn.isES6Generator()) {
+                Name name = ((FunctionNode)currentScriptOrFn).getFunctionName();
+                if (name == null || name.length() == 0) {
+                    addError("msg.anon.generator.returns", "");
+                } else {
+                    addError("msg.generator.returns", name.getIdentifier());
+                }
+            }
         }
 
         ret.setLineno(lineno);
@@ -2905,18 +2926,18 @@ public class Parser
           case Token.THROW:
               // needed for generator.throw();
               saveNameTokenData(ts.tokenBeg, "throw", ts.lineno);
-              ref = propertyName(-1, "throw", memberTypeFlags);
+              ref = propertyName(-1, memberTypeFlags);
               break;
 
           case Token.NAME:
               // handles: name, ns::name, ns::*, ns::[expr]
-              ref = propertyName(-1, ts.getString(), memberTypeFlags);
+              ref = propertyName(-1, memberTypeFlags);
               break;
 
           case Token.MUL:
               // handles: *, *::name, *::*, *::[expr]
               saveNameTokenData(ts.tokenBeg, "*", ts.lineno);
-              ref = propertyName(-1, "*", memberTypeFlags);
+              ref = propertyName(-1, memberTypeFlags);
               break;
 
           case Token.XMLATTR:
@@ -2928,7 +2949,7 @@ public class Parser
           case Token.RESERVED: {
               String name = ts.getString();
               saveNameTokenData(ts.tokenBeg, name, ts.lineno);
-              ref = propertyName(-1, name, memberTypeFlags);
+              ref = propertyName(-1, memberTypeFlags);
               break;
           }
 
@@ -2938,7 +2959,7 @@ public class Parser
                   String name = Token.keywordToName(token);
                   if (name != null) {
                       saveNameTokenData(ts.tokenBeg, name, ts.lineno);
-                      ref = propertyName(-1, name, memberTypeFlags);
+                      ref = propertyName(-1, memberTypeFlags);
                       break;
                   }
               }
@@ -2975,12 +2996,12 @@ public class Parser
         switch (tt) {
           // handles: @name, @ns::name, @ns::*, @ns::[expr]
           case Token.NAME:
-              return propertyName(atPos, ts.getString(), 0);
+              return propertyName(atPos, 0);
 
           // handles: @*, @*::name, @*::*, @*::[expr]
           case Token.MUL:
               saveNameTokenData(ts.tokenBeg, "*", ts.lineno);
-              return propertyName(atPos, "*", 0);
+              return propertyName(atPos, 0);
 
           // handles @[expr]
           case Token.LB:
@@ -3007,7 +3028,7 @@ public class Parser
      * returns a Name node.  Returns an ErrorNode for malformed XML
      * expressions.  (For now - might change to return a partial XmlRef.)
      */
-    private AstNode propertyName(int atPos, String s, int memberTypeFlags)
+    private AstNode propertyName(int atPos, int memberTypeFlags)
         throws IOException
     {
         int pos = atPos != -1 ? atPos : ts.tokenBeg, lineno = ts.lineno;
@@ -3243,7 +3264,7 @@ public class Parser
         saveNameTokenData(namePos, nameString, nameLineno);
 
         if (compilerEnv.isXmlAvailable()) {
-            return propertyName(-1, nameString, 0);
+            return propertyName(-1, 0);
         }
         return createNameNode(true, Token.NAME);
     }
@@ -3842,7 +3863,7 @@ public class Parser
     }
 
     // Return end of node.  Assumes node does NOT have a parent yet.
-    private int nodeEnd(AstNode node) {
+    private static int nodeEnd(AstNode node) {
         return node.getPosition() + node.getLength();
     }
 

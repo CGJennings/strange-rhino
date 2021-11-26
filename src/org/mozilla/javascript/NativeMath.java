@@ -18,6 +18,7 @@ final class NativeMath extends IdScriptableObject
 
     private static final Object MATH_TAG = "Math";
     private static final double LOG2E = 1.4426950408889634;
+    private static final Double Double32 = Double.valueOf(32d);
 
     static void init(Scriptable scope, boolean sealed)
     {
@@ -102,7 +103,6 @@ final class NativeMath extends IdScriptableObject
         }
     }
 
-    @SuppressWarnings("SelfAssignment")
     @Override
     public Object execIdCall(IdFunctionObject f, Context cx, Scriptable scope,
                              Scriptable thisObj, Object[] args)
@@ -135,25 +135,25 @@ final class NativeMath extends IdScriptableObject
             case Id_acosh:
                 x = ScriptRuntime.toNumber(args, 0);
                 if (!Double.isNaN(x)) {
-                    return Math.log(x + Math.sqrt(x*x - 1.0));
+                    return Double.valueOf(Math.log(x + Math.sqrt(x*x - 1.0)));
                 }
-                return Double.NaN;
+                return ScriptRuntime.NaNobj;
 
             case Id_asinh:
                 x = ScriptRuntime.toNumber(args, 0);
                 if (Double.isInfinite(x)) {
-                    return x;
+                    return Double.valueOf(x);
                 }
                 if (!Double.isNaN(x)) {
                     if (x == 0) {
                         if (1 / x > 0) {
-                            return 0.0;
+                            return ScriptRuntime.zeroObj;
                         }
-                        return -0.0;
+                        return ScriptRuntime.negativeZeroObj;
                     }
-                    return Math.log(x + Math.sqrt(x*x + 1.0));
+                    return Double.valueOf(Math.log(x + Math.sqrt(x*x + 1.0)));
                 }
-                return Double.NaN;
+                return ScriptRuntime.NaNobj;
 
             case Id_atan:
                 x = ScriptRuntime.toNumber(args, 0);
@@ -165,13 +165,13 @@ final class NativeMath extends IdScriptableObject
                 if (!Double.isNaN(x) && -1.0 <= x && x <= 1.0) {
                     if (x == 0) {
                         if (1 / x > 0) {
-                            return 0.0;
+                            return ScriptRuntime.zeroObj;
                         }
-                        return -0.0;
+                        return ScriptRuntime.negativeZeroObj;
                     }
-                    return 0.5 * Math.log((x + 1.0) / (x - 1.0));
+                    return Double.valueOf(0.5 * Math.log((x + 1.0) / (x - 1.0)));
                 }
-                return Double.NaN;
+                return ScriptRuntime.NaNobj;
 
             case Id_atan2:
                 x = ScriptRuntime.toNumber(args, 0);
@@ -193,13 +193,13 @@ final class NativeMath extends IdScriptableObject
                 if (x == 0
                         || Double.isNaN(x)
                         || Double.isInfinite(x)) {
-                    return 32;
+                    return Double32;
                 }
                 long n = ScriptRuntime.toUint32(x);
                 if (n == 0) {
-                    return 32;
+                    return Double32;
                 }
-                return 31 - Math.floor(Math.log(n >>> 0) * LOG2E);
+                return Double.valueOf(31 - Math.floor(Math.log(n >>> 0) * LOG2E));
 
             case Id_cos:
                 x = ScriptRuntime.toNumber(args, 0);
@@ -239,7 +239,8 @@ final class NativeMath extends IdScriptableObject
                 break;
 
             case Id_imul:
-                return js_imul(args);
+                x = js_imul(args);
+                break;
 
             case Id_log:
                 x = ScriptRuntime.toNumber(args, 0);
@@ -315,13 +316,13 @@ final class NativeMath extends IdScriptableObject
                 if (!Double.isNaN(x)) {
                     if (x == 0) {
                         if (1 / x > 0) {
-                            return 0.0;
+                            return ScriptRuntime.zeroObj;
                         }
-                        return -0.0;
+                        return ScriptRuntime.negativeZeroObj;
                     }
-                    return Math.signum(x);
+                    return Double.valueOf(Math.signum(x));
                 }
-                return Double.NaN;
+                return ScriptRuntime.NaNobj;
 
             case Id_sin:
                 x = ScriptRuntime.toNumber(args, 0);

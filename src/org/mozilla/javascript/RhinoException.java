@@ -47,9 +47,7 @@ public abstract class RhinoException extends RuntimeException
         }
         StringBuilder buf = new StringBuilder(details);
         buf.append(" (");
-        if (sourceName != null) {
-            buf.append(sourceName);
-        }
+        buf.append(sourceName);
         if (lineNumber > 0) {
             buf.append('#');
             buf.append(lineNumber);
@@ -76,7 +74,7 @@ public abstract class RhinoException extends RuntimeException
      * Initialize the uri of the script source containing the error.
      *
      * @param sourceName the uri of the script source responsible for the error.
-     *                   It should not be <tt>null</tt>.
+     *                   It should not be <code>null</code>.
      *
      * @throws IllegalStateException if the method is called more then once.
      */
@@ -146,7 +144,7 @@ public abstract class RhinoException extends RuntimeException
      * Initialize the text of the source line containing the error.
      *
      * @param lineSource the text of the source line responsible for the error.
-     *                   It should not be <tt>null</tt>.
+     *                   It should not be <code>null</code>.
      *
      * @throws IllegalStateException if the method is called more then once.
      */

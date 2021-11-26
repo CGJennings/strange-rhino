@@ -20,15 +20,15 @@ import java.util.WeakHashMap;
  */
 public class NativeWeakMap extends IdScriptableObject {
     private static final long serialVersionUID = 8670434366883930453L;
-    
+
     private static final Object MAP_TAG = "WeakMap";
-    
+
     private boolean instanceOfWeakMap = false;
-    
+
     private transient WeakHashMap<Scriptable, Object> map = new WeakHashMap<>();
-    
+
     private static final Object NULL_VALUE = new Object();
-    
+
     static void init(Scriptable scope, boolean sealed) {
         NativeWeakMap m = new NativeWeakMap();
         m.exportAsJSClass(MAX_PROTOTYPE_ID, scope, sealed);
@@ -74,10 +74,9 @@ public class NativeWeakMap extends IdScriptableObject {
 
     private Object js_delete(Object key) {
         if (!ScriptRuntime.isObject(key)) {
-            return false;
+            return Boolean.FALSE;
         }
-        final Object oldVal = map.remove(key);
-        return (oldVal != null);
+        return Boolean.valueOf(map.remove(key) != null);
     }
 
     private Object js_get(Object key) {
@@ -95,9 +94,9 @@ public class NativeWeakMap extends IdScriptableObject {
 
     private Object js_has(Object key) {
         if (!ScriptRuntime.isObject(key)) {
-            return false;
+            return Boolean.FALSE;
         }
-        return map.containsKey(key);
+        return Boolean.valueOf(map.containsKey(key));
     }
 
     private Object js_set(Object key, Object v) {
@@ -115,7 +114,7 @@ public class NativeWeakMap extends IdScriptableObject {
         return this;
     }
 
-    private NativeWeakMap realThis(Scriptable thisObj, IdFunctionObject f) {
+    private static NativeWeakMap realThis(Scriptable thisObj, IdFunctionObject f) {
         if (thisObj == null) {
             throw incompatibleCallError(f);
         }
