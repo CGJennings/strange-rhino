@@ -6,7 +6,6 @@
 
 package org.mozilla.javascript;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -447,15 +446,6 @@ public class Parser
         return tt;
     }
 
-    private int nextFlaggedToken()
-        throws IOException
-    {
-        peekToken();
-        int ttFlagged = currentFlaggedToken;
-        consumeToken();
-        return ttFlagged;
-    }
-
     private boolean matchToken(int toMatch, boolean ignoreComment)
         throws IOException
     {
@@ -603,13 +593,15 @@ public class Parser
      * Builds a parse tree from the given sourcereader.
      * @see #parse(String,String,int)
      * @throws IOException if the {@link Reader} encounters an error
+     * @deprecated use parse(String, String, int) instead
      */
+     @Deprecated
     public AstRoot parse(Reader sourceReader, String sourceURI, int lineno)
         throws IOException
     {
         if (parseFinished) throw new IllegalStateException("parser reused");
         if (compilerEnv.isIdeMode()) {
-            return parse(readFully(sourceReader), sourceURI, lineno);
+            return parse(Kit.readReader(sourceReader), sourceURI, lineno);
         }
         try {
             this.sourceURI = sourceURI;
@@ -2628,7 +2620,7 @@ public class Parser
                   return memberExprTail(true, xmlInitializer());
               }
               // Fall thru to the default handling of RELOP
-              // fallthru
+              // fall through
 
           default:
               AstNode pn = memberExpr(true);
@@ -3280,6 +3272,8 @@ public class Parser
                     elements.add(new EmptyExpression(ts.tokenBeg, 1));
                     skipCount++;
                 }
+            } else if(tt == Token.COMMENT) {
+                consumeToken();
             } else if (tt == Token.RB) {
                 consumeToken();
                 // for ([a,] in obj) is legal, but for ([a] in obj) is
@@ -3407,7 +3401,7 @@ public class Parser
                     isForOf = true;
                     break;
                 }
-                // fallthru
+                // fall through
             default:
                 reportError("msg.in.after.for.name");
             }
@@ -3922,19 +3916,6 @@ public class Parser
             }
             pos = Math.max(pos, lineBeginningFor(commaPos));
             addWarning("msg.extra.trailing.comma", pos, commaPos - pos);
-        }
-    }
-
-
-    private String readFully(Reader reader) throws IOException {
-        try (BufferedReader in = new BufferedReader(reader)) {
-            char[] cbuf = new char[1024];
-            StringBuilder sb = new StringBuilder(1024);
-            int bytes_read;
-            while ((bytes_read = in.read(cbuf, 0, 1024)) != -1) {
-                sb.append(cbuf, 0, bytes_read);
-            }
-            return sb.toString();
         }
     }
 

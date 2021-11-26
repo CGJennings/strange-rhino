@@ -4,8 +4,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/** CGJ: file modified from original as indicated by blocks marked "CGJ" */
-
 package org.mozilla.javascript;
 
 import java.io.IOException;
@@ -392,11 +390,11 @@ class TokenStream
                 case 't': if (isStrict) {
                     X="static";id=Id_static; break L;
                 }
-                // fallthru
+                // fall through
                 case 'u': if (isStrict) {
                     X="public";id=Id_public; break L;
                 }
-                // fallthru
+                // fall through
                 case 'w': X="switch";id=Id_switch; break L;
                 case 'x': X="export";id=Id_export; break L;
                 case 'y': X="typeof";id=Id_typeof; break L;
@@ -405,13 +403,13 @@ class TokenStream
                 case 'a': if (isStrict) {
                     X="package";id=Id_package; break L;
                 }
-                // fallthru
+                // fall through
                 case 'e': X="default";id=Id_default; break L;
                 case 'i': X="finally";id=Id_finally; break L;
                 case 'r': if (isStrict) {
                     X="private";id=Id_private; break L;
                 }
-                // fallthru
+                // fall through
                 case 'x': X="extends";id=Id_extends; break L;
                 } break L;
             case 8: switch (s.charAt(0)) {
@@ -484,9 +482,7 @@ class TokenStream
             tokenBeg = cursor - 1;
             tokenEnd = cursor;
 
-/* CGJ BEGIN: Comment out this line so that '@' can appear in regular symbol names. */
-//            if (c == '@') return Token.XMLATTR;
-/* CGJ END -------------------------- */
+            if (c == '@') return Token.XMLATTR;
 
             // identifier/keyword/instanceof?
             // watch out for starting with a <backslash>
@@ -504,9 +500,7 @@ class TokenStream
                     c = '\\';
                 }
             } else {
-/* CGJ BEGIN: Add '@' and '#' as identifier start chars. */
-                identifierStart = Character.isJavaIdentifierStart((char)c) || (c == '@') || (c == '#');;
-/* CGJ END -------------------------- */
+                identifierStart = Character.isJavaIdentifierStart((char)c);
                 if (identifierStart) {
                     stringBufferTop = 0;
                     addToString(c);
@@ -547,15 +541,6 @@ class TokenStream
                                 parser.addError("msg.illegal.character", c);
                                 return Token.ERROR;
                             }
-/* CGJ BEGIN: Allow '-' inside @/#/$ identifiers. */
-                        } else if (c == '-') {
-                            char idStart = stringBuffer[0];
-                            if (idStart == '$' || idStart == '@' || idStart == '#') {
-                                addToString(c);
-                            } else {
-                                break;
-                            }
-/* CGJ END -------------------------- */
                         } else {
                             if (c == EOF_CHAR || c == BYTE_ORDER_MARK
                                 || !Character.isJavaIdentifierPart((char)c))

@@ -325,9 +325,9 @@ public class ClassFileWriter {
             index = putInt16(itsExceptionTableTop, codeAttribute, index);
             for (int i = 0; i < itsExceptionTableTop; i++) {
                 ExceptionTableEntry ete = itsExceptionTable[i];
-                short startPC = (short) getLabelPC(ete.itsStartLabel);
-                short endPC = (short) getLabelPC(ete.itsEndLabel);
-                short handlerPC = (short) getLabelPC(ete.itsHandlerLabel);
+                int startPC = getLabelPC(ete.itsStartLabel);
+                int endPC = getLabelPC(ete.itsEndLabel);
+                int handlerPC = getLabelPC(ete.itsHandlerLabel);
                 short catchType = ete.itsCatchType;
                 if (startPC == -1)
                     throw new IllegalStateException("start label not defined");
@@ -337,6 +337,8 @@ public class ClassFileWriter {
                     throw new IllegalStateException(
                         "handler label not defined");
 
+                // no need to cast to short here, the putInt16 uses only
+                // the short part of the int
                 index = putInt16(startPC, codeAttribute, index);
                 index = putInt16(endPC, codeAttribute, index);
                 index = putInt16(handlerPC, codeAttribute, index);
@@ -464,7 +466,7 @@ public class ClassFileWriter {
                 // generated and Sun's verifier is expecting type state to be
                 // placed even at dead blocks of code.
                 addSuperBlockStart(itsCodeBufferTop + 3);
-                // fallthru...
+                // fall through...
             case ByteCode.IFEQ:
             case ByteCode.IFNE:
             case ByteCode.IFLT:
@@ -692,7 +694,7 @@ public class ClassFileWriter {
             if (theOperand2 < 0 ||  65536 <= theOperand2)
                 throw new ClassFileFormatException("out of range increment");
 
-            if (theOperand1 > 255 || theOperand2 < -128 || theOperand2 > 127) {
+            if (theOperand1 > 255 || theOperand2 > 127) {
                 addToCodeBuffer(ByteCode.WIDE);
                 addToCodeBuffer(ByteCode.IINC);
                 addToCodeInt16(theOperand1);
@@ -1529,8 +1531,8 @@ public class ClassFileWriter {
 
             for (int i = 0; i < itsExceptionTableTop; i++) {
                 ExceptionTableEntry ete = itsExceptionTable[i];
-                short startPC = (short) getLabelPC(ete.itsStartLabel);
-                short handlerPC = (short) getLabelPC(ete.itsHandlerLabel);
+                int startPC = getLabelPC(ete.itsStartLabel);
+                int handlerPC = getLabelPC(ete.itsHandlerLabel);
                 SuperBlock handlerSB = getSuperBlockFromOffset(handlerPC);
                 SuperBlock dep = getSuperBlockFromOffset(startPC);
                 deps[handlerSB.getIndex()] = dep;
@@ -1780,13 +1782,12 @@ public class ClassFileWriter {
 
                 for (int i = 0; i < itsExceptionTableTop; i++) {
                     ExceptionTableEntry ete = itsExceptionTable[i];
-                    short startPC = (short) getLabelPC(ete.itsStartLabel);
-                    short endPC = (short) getLabelPC(ete.itsEndLabel);
+                    int startPC = getLabelPC(ete.itsStartLabel);
+                    int endPC = getLabelPC(ete.itsEndLabel);
                     if (bci < startPC || bci >= endPC) {
                         continue;
                     }
-                    short handlerPC =
-                        (short) getLabelPC(ete.itsHandlerLabel);
+                    int handlerPC = getLabelPC(ete.itsHandlerLabel);
                     SuperBlock sb = getSuperBlockFromOffset(handlerPC);
                     int exceptionType;
 
@@ -1880,7 +1881,7 @@ public class ClassFileWriter {
                 case ByteCode.CASTORE:
                 case ByteCode.SASTORE:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.PUTFIELD: // pop; pop
                 case ByteCode.IF_ICMPEQ:
                 case ByteCode.IF_ICMPNE:
@@ -1891,7 +1892,7 @@ public class ClassFileWriter {
                 case ByteCode.IF_ACMPEQ:
                 case ByteCode.IF_ACMPNE:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.IFEQ: // pop
                 case ByteCode.IFNE:
                 case ByteCode.IFLT:
@@ -1933,7 +1934,7 @@ public class ClassFileWriter {
                 case ByteCode.DCMPL:
                 case ByteCode.DCMPG:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.INEG: // pop; push(INTEGER)
                 case ByteCode.L2I:
                 case ByteCode.F2I:
@@ -1944,7 +1945,7 @@ public class ClassFileWriter {
                 case ByteCode.ARRAYLENGTH:
                 case ByteCode.INSTANCEOF:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.ICONST_M1: // push(INTEGER)
                 case ByteCode.ICONST_0:
                 case ByteCode.ICONST_1:
@@ -1974,13 +1975,13 @@ public class ClassFileWriter {
                 case ByteCode.LOR:
                 case ByteCode.LXOR:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.LNEG: // pop; push(LONG)
                 case ByteCode.I2L:
                 case ByteCode.F2L:
                 case ByteCode.D2L:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.LCONST_0: // push(LONG)
                 case ByteCode.LCONST_1:
                 case ByteCode.LLOAD:
@@ -1997,13 +1998,13 @@ public class ClassFileWriter {
                 case ByteCode.FDIV:
                 case ByteCode.FREM:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.FNEG: // pop; push(FLOAT)
                 case ByteCode.I2F:
                 case ByteCode.L2F:
                 case ByteCode.D2F:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.FCONST_0: // push(FLOAT)
                 case ByteCode.FCONST_1:
                 case ByteCode.FCONST_2:
@@ -2021,13 +2022,13 @@ public class ClassFileWriter {
                 case ByteCode.DDIV:
                 case ByteCode.DREM:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.DNEG: // pop; push(DOUBLE)
                 case ByteCode.I2D:
                 case ByteCode.L2D:
                 case ByteCode.F2D:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.DCONST_0: // push(DOUBLE)
                 case ByteCode.DCONST_1:
                 case ByteCode.DLOAD:
@@ -2208,7 +2209,7 @@ public class ClassFileWriter {
                     break;
                 case ByteCode.GETFIELD:
                     pop();
-                    // fallthru
+                    // fall through
                 case ByteCode.GETSTATIC:
                     index = getOperand(bci + 1, 2);
                     FieldOrMethodRef f = (FieldOrMethodRef)
@@ -2899,7 +2900,7 @@ public class ClassFileWriter {
                     case 'J':
                     case 'D':
                         --stackDiff;
-                        // fallthru
+                        // fall through
                     case 'B':
                     case 'S':
                     case 'C':
@@ -2934,9 +2935,9 @@ public class ClassFileWriter {
                                 ++index;
                                 continue;
                             case 'L':
-                                // fallthru
+                                // fall through
                         }
-                        // fallthru
+                        // fall through
                     case 'L': {
                         --stackDiff;
                         ++count;
@@ -2960,7 +2961,7 @@ public class ClassFileWriter {
                     case 'J':
                     case 'D':
                         ++stackDiff;
-                        // fallthru
+                        // fall through
                     case 'B':
                     case 'S':
                     case 'C':
@@ -2970,7 +2971,7 @@ public class ClassFileWriter {
                     case 'L':
                     case '[':
                         ++stackDiff;
-                        // fallthru
+                        // fall through
                     case 'V':
                         break;
                 }

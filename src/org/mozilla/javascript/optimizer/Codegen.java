@@ -1086,7 +1086,7 @@ public class Codegen implements Evaluator
                     "org/mozilla/javascript/optimizer/OptRuntime",
                     "minusOneObj", "Ljava/lang/Double;");
 
-        } else if (num != num) {
+        } else if (Double.isNaN(num)) { 
             cfw.add(ByteCode.GETSTATIC,
                     "org/mozilla/javascript/ScriptRuntime",
                     "NaNobj", "Ljava/lang/Double;");
@@ -1766,9 +1766,9 @@ class BodyCodegen
 
             // generate dispatch tables for finally
             if (finallys != null) {
-                for (Node n: finallys.keySet()) {
-                    if (n.getType() == Token.FINALLY) {
-                        FinallyReturnPoint ret = finallys.get(n);
+                for (Map.Entry<Node, FinallyReturnPoint> e : finallys.entrySet()) {
+                    if (e.getKey().getType() == Token.FINALLY) {
+                        FinallyReturnPoint ret = e.getValue();
                         // the finally will jump here
                         cfw.markLabel(ret.tableLabel, (short)1);
 
@@ -2129,6 +2129,9 @@ class BodyCodegen
                     FinallyReturnPoint ret = finallys.get(node);
                     ret.tableLabel = cfw.acquireLabel();
                     cfw.add(ByteCode.GOTO, ret.tableLabel);
+
+                    // After this GOTO we expect stack to be empty again!
+                    cfw.setStackTop((short)0);
 
                     releaseWordLocal((short)finallyRegister);
                     cfw.markLabel(finallyEnd);
@@ -3053,6 +3056,8 @@ class BodyCodegen
         FinallyReturnPoint ret = finallys.get(target);
         cfw.addLoadConstant(ret.jsrPoints.size());
         addGoto(target, ByteCode.GOTO);
+        // Don't leave something on the stack here!
+        cfw.add(ByteCode.POP);
         int retLabel = cfw.acquireLabel();
         cfw.markLabel(retLabel);
         ret.jsrPoints.add(Integer.valueOf(retLabel));

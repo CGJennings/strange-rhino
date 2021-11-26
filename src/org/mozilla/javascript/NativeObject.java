@@ -49,6 +49,10 @@ public class NativeObject extends IdScriptableObject implements Map
     {
         addIdFunctionProperty(ctor, OBJECT_TAG, ConstructorId_getPrototypeOf,
                 "getPrototypeOf", 1);
+        if (Context.getCurrentContext().version >= Context.VERSION_ES6) {
+            addIdFunctionProperty(ctor, OBJECT_TAG, ConstructorId_setPrototypeOf,
+                    "setPrototypeOf", 2);
+        }
         addIdFunctionProperty(ctor, OBJECT_TAG, ConstructorId_keys,
                 "keys", 1);
         addIdFunctionProperty(ctor, OBJECT_TAG, ConstructorId_getOwnPropertyNames,
@@ -156,9 +160,15 @@ public class NativeObject extends IdScriptableObject implements Map
           }
 
           case Id_valueOf:
+              if (cx.getLanguageVersion() >= Context.VERSION_1_8 && (thisObj == null || Undefined.isUndefined(thisObj))) {
+                  throw ScriptRuntime.typeError0("msg." + (thisObj == null ? "null" : "undef") + ".to.object");
+              }
             return thisObj;
 
           case Id_hasOwnProperty: {
+              if (cx.getLanguageVersion() >= Context.VERSION_1_8 && (thisObj == null || Undefined.isUndefined(thisObj))) {
+                  throw ScriptRuntime.typeError0("msg." + (thisObj == null ? "null" : "undef") + ".to.object");
+              }
               boolean result;
               Object arg = args.length < 1 ? Undefined.instance : args[0];
               if (arg instanceof Symbol) {
@@ -176,6 +186,10 @@ public class NativeObject extends IdScriptableObject implements Map
           }
 
           case Id_propertyIsEnumerable: {
+              if (cx.getLanguageVersion() >= Context.VERSION_1_8 && (thisObj == null || Undefined.isUndefined(thisObj))) {
+                  throw ScriptRuntime.typeError0("msg." + (thisObj == null ? "null" : "undef") + ".to.object");
+              }
+              
             boolean result;
             Object arg = args.length < 1 ? Undefined.instance : args[0];
 
@@ -220,6 +234,10 @@ public class NativeObject extends IdScriptableObject implements Map
           }
 
           case Id_isPrototypeOf: {
+              if (cx.getLanguageVersion() >= Context.VERSION_1_8 && (thisObj == null || Undefined.isUndefined(thisObj))) {
+                  throw ScriptRuntime.typeError0("msg." + (thisObj == null ? "null" : "undef") + ".to.object");
+              }
+              
             boolean result = false;
             if (args.length != 0 && args[0] instanceof Scriptable) {
                 Scriptable v = (Scriptable) args[0];
@@ -300,6 +318,35 @@ public class NativeObject extends IdScriptableObject implements Map
                 Object arg = args.length < 1 ? Undefined.instance : args[0];
                 Scriptable obj = getCompatibleObject(cx, scope, arg);
                 return obj.getPrototype();
+              }
+          case ConstructorId_setPrototypeOf:
+              {
+                if (args.length < 2) {
+                  throw ScriptRuntime.typeError1("msg.incompat.call", "setPrototypeOf");
+                }
+                Scriptable proto = (args[1] == null) ? null : ensureScriptable(args[1]);
+                if (proto instanceof Symbol) {
+                    throw ScriptRuntime.typeError1("msg.arg.not.object", ScriptRuntime.typeof(proto));
+                }
+
+                if ( !(args[0] instanceof ScriptableObject) ) {
+                    return args[0];
+                }
+                ScriptableObject obj = (ScriptableObject) args[0];
+                if (!obj.isExtensible()) {
+                    throw ScriptRuntime.typeError0("msg.not.extensible");
+                }
+
+                // cycle detection
+                Scriptable prototypeProto = proto;
+                while (prototypeProto != null) {
+                    if (prototypeProto == obj) {
+                        throw ScriptRuntime.typeError1("msg.object.cyclic.prototype", obj.getClass().getSimpleName());
+                    }
+                    prototypeProto = prototypeProto.getPrototype();
+                }
+                obj.setPrototype(proto);
+                return obj;
               }
           case ConstructorId_keys:
               {
@@ -386,7 +433,7 @@ public class NativeObject extends IdScriptableObject implements Map
                 Object arg = args.length < 1 ? Undefined.instance : args[0];
                 ScriptableObject obj = ensureScriptableObject(arg);
                 Object propsObj = args.length < 2 ? Undefined.instance : args[1];
-                Scriptable props = Context.toObject(propsObj, getParentScope());
+                Scriptable props = Context.toObject(propsObj, scope);
                 obj.defineOwnProperties(cx, ensureScriptableObject(props));
                 return obj;
               }
@@ -396,11 +443,11 @@ public class NativeObject extends IdScriptableObject implements Map
                 Scriptable obj = (arg == null) ? null : ensureScriptable(arg);
 
                 ScriptableObject newObject = new NativeObject();
-                newObject.setParentScope(getParentScope());
+                newObject.setParentScope(scope);
                 newObject.setPrototype(obj);
 
                 if (args.length > 1 && args[1] != Undefined.instance) {
-                  Scriptable props = Context.toObject(args[1], getParentScope());
+                  Scriptable props = Context.toObject(args[1], scope);
                   newObject.defineOwnProperties(cx, ensureScriptableObject(props));
                 }
 
@@ -823,6 +870,7 @@ public class NativeObject extends IdScriptableObject implements Map
         ConstructorId_getOwnPropertySymbols = -14,
         ConstructorId_assign = -15,
         ConstructorId_is = -16,
+        ConstructorId_setPrototypeOf = -17,
 
         Id_constructor           = 1,
         Id_toString              = 2,

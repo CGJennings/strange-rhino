@@ -31,10 +31,9 @@ import org.mozilla.javascript.NativeArrayIterator.ARRAY_ITERATOR_TYPE;
  * shows a view of a specific NativeArrayBuffer, and modifications here will affect the rest.
  */
 
-public abstract class NativeTypedArrayView<T>
-    extends NativeArrayBufferView
-    implements List<T>, RandomAccess, ExternalArrayData
-{
+public abstract class NativeTypedArrayView<T> extends NativeArrayBufferView implements List<T>, RandomAccess, ExternalArrayData {
+    private static final long serialVersionUID = -4963053773152251274L;
+
     /** The length, in elements, of the array */
     protected final int length;
 
@@ -344,7 +343,7 @@ public abstract class NativeTypedArrayView<T>
         String s, fnName = null;
         int arity;
         switch (id) {
-        case Id_constructor:        arity = 1; s = "constructor"; break;
+        case Id_constructor:        arity = 3; s = "constructor"; break;
         case Id_toString:           arity = 0; s = "toString"; break;
         case Id_get:                arity = 1; s = "get"; break;
         case Id_set:                arity = 2; s = "set"; break;
@@ -409,7 +408,10 @@ public abstract class NativeTypedArrayView<T>
     @Override
     protected void fillConstructorProperties(IdFunctionObject ctor)
     {
-        ctor.put("BYTES_PER_ELEMENT", ctor, ScriptRuntime.wrapInt(getBytesPerElement()));
+        ctor.defineProperty("BYTES_PER_ELEMENT", ScriptRuntime.wrapInt(getBytesPerElement()),
+                DONTENUM | PERMANENT | READONLY);
+
+        super.fillConstructorProperties(ctor);
     }
 
     // Property dispatcher
@@ -461,6 +463,9 @@ public abstract class NativeTypedArrayView<T>
         if (id == 0) {
             return super.findInstanceIdInfo(s);
         }
+        if (id == Id_BYTES_PER_ELEMENT) {
+            return instanceIdInfo(DONTENUM | READONLY | PERMANENT, id);
+        }
         return instanceIdInfo(READONLY | PERMANENT, id);
     }
 
@@ -494,27 +499,6 @@ public abstract class NativeTypedArrayView<T>
     }
 
     // Abstract List implementation
-
-    @SuppressWarnings("unused")
-    @Override
-    public int size()
-    {
-        return length;
-    }
-
-    @SuppressWarnings("unused")
-    @Override
-    public boolean isEmpty()
-    {
-        return (length == 0);
-    }
-
-    @SuppressWarnings("unused")
-    @Override
-    public boolean contains(Object o)
-    {
-        return (indexOf(o) >= 0);
-    }
 
     @SuppressWarnings("unused")
     @Override
@@ -584,10 +568,36 @@ public abstract class NativeTypedArrayView<T>
         }
         return a;
     }
+    
+
+    @SuppressWarnings("unused")
+    @Override
+    public int size()
+    {
+        return length;
+    }
+
+    @SuppressWarnings("unused")
+    @Override
+    public boolean isEmpty()
+    {
+        return (length == 0);
+    }
+
+    @SuppressWarnings("unused")
+    @Override
+    public boolean contains(Object o)
+    {
+        return (indexOf(o) >= 0);
+    }
+
 
     @Override
     public boolean equals(Object o)
     {
+        if (o == null) {
+            return false;
+        }
         try {
             NativeTypedArrayView<T> v = (NativeTypedArrayView<T>)o;
             if (length != v.length) {

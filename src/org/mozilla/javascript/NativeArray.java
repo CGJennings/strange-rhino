@@ -8,6 +8,7 @@ package org.mozilla.javascript;
 
 import static org.mozilla.javascript.ScriptRuntimeES6.requireObjectCoercible;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -351,7 +352,7 @@ public class NativeArray extends IdScriptableObject implements List
                 return js_lastIndexOf(cx, scope, thisObj, args);
 
               case Id_includes:
-                return ScriptRuntime.toObject(cx, scope, ((long) js_indexOf(cx, scope, thisObj, args)) > -1);
+                return js_includes(cx, scope, thisObj, args);
 
               case Id_fill:
                 return js_fill(cx, scope, thisObj, args);
@@ -431,7 +432,7 @@ public class NativeArray extends IdScriptableObject implements List
     }
 
     private static long toArrayIndex(double d) {
-        if (d == d) {
+        if (!Double.isNaN(d)) {
             long index = ScriptRuntime.toUint32(d);
             if (index == d && index != 4294967295L) {
                 return index;
@@ -996,14 +997,7 @@ public class NativeArray extends IdScriptableObject implements List
                         result.append(ScriptRuntime.uneval(cx, scope, elem));
 
                     } else if (elem instanceof String) {
-                        String s = (String)elem;
-                        if (toSource) {
-                            result.append('\"');
-                            result.append(ScriptRuntime.escapeString(s));
-                            result.append('\"');
-                        } else {
-                            result.append(s);
-                        }
+                        result.append((String)elem);
 
                     } else {
                         if (toLocale) {
@@ -1149,13 +1143,14 @@ public class NativeArray extends IdScriptableObject implements List
                     cmpBuf[1] = y;
                     Object ret = jsCompareFunction.call(cx, scope, funThis,
                         cmpBuf);
-                    final double d = ScriptRuntime.toNumber(ret);
-                    if (d < 0) {
+                    double d = ScriptRuntime.toNumber(ret);
+                    int cmp = Double.compare(d, 0);
+                    if (cmp < 0) {
                       return -1;
-                    } else if (d > 0) {
+                    } else if (cmp > 0) {
                       return +1;
                     }
-                    return 0; // ??? double and 0???
+                    return 0;
                   }
                 });
         } else {
@@ -1711,6 +1706,59 @@ public class NativeArray extends IdScriptableObject implements List
         return NEGATIVE_ONE;
     }
 
+    /*
+       See ECMA-262 22.1.3.13
+    */
+    private static Boolean js_includes(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        Object compareTo = args.length > 0 ? args[0] : Undefined.instance;
+
+        Scriptable o = ScriptRuntime.toObject(cx, scope, thisObj);
+        long len = ScriptRuntime.toLength(new Object[]{getProperty(thisObj, "length")}, 0);
+        if (len == 0) return Boolean.FALSE;
+
+        long k;
+        if (args.length < 2) {
+            k = 0;
+        } else {
+            k = (long) ScriptRuntime.toInteger(args[1]);
+            if (k < 0) {
+                k += len;
+                if (k < 0)
+                    k = 0;
+            }
+            if (k > len - 1) return Boolean.FALSE;
+        }
+        if (o instanceof NativeArray) {
+            NativeArray na = (NativeArray) o;
+            if (na.denseOnly) {
+                Scriptable proto = na.getPrototype();
+                for (int i = (int) k; i < len; i++) {
+                    Object elementK = na.dense[i];
+                    if (elementK == NOT_FOUND && proto != null) {
+                        elementK = ScriptableObject.getProperty(proto, i);
+                    }
+                    if (elementK == NOT_FOUND) {
+                        elementK = Undefined.instance;
+                    }
+                    if (ScriptRuntime.sameZero(elementK, compareTo)) {
+                        return Boolean.TRUE;
+                    }
+                }
+                return Boolean.FALSE;
+            }
+        }
+        for (; k < len; k++) {
+            Object elementK = getRawElem(o, k);
+            if (elementK == NOT_FOUND) {
+                elementK = Undefined.instance;
+            }
+            if (ScriptRuntime.sameZero(elementK, compareTo)) {
+                return Boolean.TRUE;
+            }
+        }
+        return Boolean.FALSE;
+    }
+
     private static Object js_fill(Context cx, Scriptable scope, Scriptable thisObj, Object[] args)
     {
         Scriptable o = ScriptRuntime.toObject(cx, scope, thisObj);
@@ -2235,8 +2283,10 @@ public class NativeArray extends IdScriptableObject implements List
     private static final Comparator<Object> DEFAULT_COMPARATOR = new ElementComparator();
 
     public static final class StringLikeComparator
-      implements Comparator<Object> {
+      implements Comparator<Object>, Serializable {
 
+      private static final long serialVersionUID = 5299017659728190979L;
+    
       @Override
       public int compare(final Object x, final Object y) {
         final String a = ScriptRuntime.toString(x);
@@ -2246,7 +2296,9 @@ public class NativeArray extends IdScriptableObject implements List
     }
 
     public static final class ElementComparator
-      implements Comparator<Object> {
+      implements Comparator<Object>, Serializable {
+
+      private static final long serialVersionUID = -1189948017688708858L;
 
       private final Comparator<Object> child;
 
