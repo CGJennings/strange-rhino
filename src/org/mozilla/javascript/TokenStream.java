@@ -4,6 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+/** CGJ: file modified from original as indicated by blocks marked "CGJ" */
+
 package org.mozilla.javascript;
 
 import java.io.*;
@@ -482,7 +484,9 @@ class TokenStream
             tokenBeg = cursor - 1;
             tokenEnd = cursor;
 
-            if (c == '@') return Token.XMLATTR;
+/* CGJ BEGIN: Comment out this line so that '@' can appear in regular symbol names. */
+//            if (c == '@') return Token.XMLATTR;
+/* CGJ END -------------------------- */
 
             // identifier/keyword/instanceof?
             // watch out for starting with a <backslash>
@@ -500,7 +504,9 @@ class TokenStream
                     c = '\\';
                 }
             } else {
-                identifierStart = Character.isJavaIdentifierStart((char)c);
+/* CGJ BEGIN: Add '@' and '#' as identifier start chars. */
+                identifierStart = Character.isJavaIdentifierStart((char)c) || (c == '@') || (c == '#');;
+/* CGJ END -------------------------- */
                 if (identifierStart) {
                     stringBufferTop = 0;
                     addToString(c);
@@ -541,6 +547,15 @@ class TokenStream
                                 parser.addError("msg.illegal.character", c);
                                 return Token.ERROR;
                             }
+/* CGJ BEGIN: Allow '-' inside @/#/$ identifiers. */
+                        } else if (c == '-') {
+                            char idStart = stringBuffer[0];
+                            if (idStart == '$' || idStart == '@' || idStart == '#') {
+                                addToString(c);
+                            } else {
+                                break;
+                            }
+/* CGJ END -------------------------- */
                         } else {
                             if (c == EOF_CHAR || c == BYTE_ORDER_MARK
                                 || !Character.isJavaIdentifierPart((char)c))
