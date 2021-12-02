@@ -250,13 +250,8 @@ public class ImporterTopLevel extends TopLevel {
     {
         if (topScopeFlag) {
             // when used as top scope importPackage and importClass are global
-            // function that ignore thisObj. We use the the top level scope
-            // which might not be the same as 'this' when used shared scopes
-            thisObj = ScriptableObject.getTopLevelScope(scope);
-            // revert to old (<= 1.7.13) behaviour if top level scope is not a ScriptableObject
-            if (!(thisObj instanceof ScriptableObject)) {
-                thisObj = this;
-            }
+            // function that ignore thisObj
+            return this;
         }
         if (!(thisObj instanceof ImporterTopLevel))
             throw new AssertionError();//incompatibleCallError(f);
