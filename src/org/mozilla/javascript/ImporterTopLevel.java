@@ -101,9 +101,13 @@ public class ImporterTopLevel extends TopLevel {
     private Object getPackageProperty(String name, Scriptable start) {
         Object result = NOT_FOUND;
         Scriptable scope = start;
-        if (topScopeFlag) {
-            scope = ScriptableObject.getTopLevelScope(scope);
-        }
+
+/* CGJ Begin: Fix importPackage failing in SE scripts */
+        scope = this;
+//        if (topScopeFlag) {
+//            scope = ScriptableObject.getTopLevelScope(scope);
+//        }
+/* CGJ END -------------------------- */
         Object[] elements = getNativeJavaPackages(scope);
         if (elements == null) {
             return result;
@@ -268,10 +272,12 @@ public class ImporterTopLevel extends TopLevel {
             // function that ignore thisObj. We use the the top level scope
             // which might not be the same as 'this' when used shared scopes
             thisObj = ScriptableObject.getTopLevelScope(scope);
+/* CGJ Begin: Fix importPackage failing in SE scripts */
             // revert to old (<= 1.7.13) behaviour if top level scope is not a ScriptableObject
             if (!(thisObj instanceof ScriptableObject)) {
                 thisObj = this;
             }
+/* CGJ END -------------------------- */
         }
         return ensureType(thisObj, ScriptableObject.class, f);
     }
